@@ -20,6 +20,8 @@ export async function getMovieService() {
                         title: tmdbData.title,
                         poster_path: tmdbData.poster_path,
                         release_year: tmdbData.release_date ? parseInt(tmdbData.release_date.substring(0, 4)) : null,
+                        overview: tmdbData.overview,
+                        genres: tmdbData.genres?.map(g => g.name) || [],
                     };
                 } catch (e) {
                     console.error(`Failed to hydrate movie ${item.tmdb_id}:`, e);
@@ -76,6 +78,28 @@ export async function getMovieService() {
             if (error) throw error
 
             return hydrateWithTMDb(data || []);
+        },
+
+        async getRandomRecommendation(): Promise<TasteCandidate | null> {
+            // First get count
+            const { count, error: countError } = await supabase
+                .from('taste_candidates')
+                .select('*', { count: 'exact', head: true });
+
+            if (countError || !count) return null;
+
+            const randomIndex = Math.floor(Math.random() * count);
+
+            const { data, error } = await supabase
+                .from('taste_candidates')
+                .select('*')
+                .range(randomIndex, randomIndex)
+                .single();
+
+            if (error || !data) return null;
+
+            const hydrated = await hydrateWithTMDb([data]);
+            return hydrated[0];
         }
     }
 }

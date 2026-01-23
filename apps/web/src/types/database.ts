@@ -27,4 +27,6 @@ export interface TasteCandidate {
     title?: string;
     poster_path?: string | null;
     release_year?: number | null;
+    overview?: string;
+    genres?: string[];
 }

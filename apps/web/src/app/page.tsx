@@ -3,6 +3,7 @@ import { StatsGrid } from '@/components/dashboard/StatsGrid';
 import { RecentMovies } from '@/components/dashboard/RecentMovies';
 import { RecentInteractions } from '@/components/dashboard/RecentInteractions';
 import { TopCandidates } from '@/components/dashboard/TopCandidates';
+import { FeaturedRecommendation } from '@/components/dashboard/FeaturedRecommendation';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,11 +11,12 @@ export default async function Page() {
   const movieService = await getMovieService();
 
   // Parallel fetching for performance
-  const [stats, recentMovies, recentInteractions, topCandidates] = await Promise.all([
+  const [stats, recentMovies, recentInteractions, topCandidates, featured] = await Promise.all([
     movieService.getStats(),
     movieService.getRecentMovies(6),
     movieService.getRecentInteractions(5),
     movieService.getTopCandidates(8),
+    movieService.getRandomRecommendation(),
   ]);
 
   return (
@@ -53,6 +55,9 @@ export default async function Page() {
 
           {/* Right Column: Activity & Library */}
           <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Featured Recommendation - Now at the Top */}
+            <FeaturedRecommendation initialCandidate={featured} />
+
             <RecentMovies movies={recentMovies} />
             <RecentInteractions interactions={recentInteractions} />
           </div>

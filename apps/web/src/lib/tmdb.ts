@@ -21,7 +21,8 @@ export interface TMDbMovie {
     vote_average: number;
     vote_count: number;
     popularity: number;
-    genre_ids: number[];
+    genre_ids?: number[];
+    genres?: { id: number; name: string }[];
 }
 
 export interface TMDbSearchResponse {
