@@ -9,27 +9,37 @@ export async function getMovieService() {
 
     /**
      * Helper to hydrate database results with French TMDb content
+     * Uses batching to prevent saturating the network/API
      */
     async function hydrateWithTMDb<T extends { tmdb_id: number }>(items: T[]): Promise<T[]> {
-        return Promise.all(
-            items.map(async (item) => {
-                try {
-                    const tmdbData = await getMovieDetails(item.tmdb_id, 'fr-FR');
-                    return {
-                        ...item,
-                        title: tmdbData.title,
-                        poster_path: tmdbData.poster_path,
-                        release_year: tmdbData.release_date ? parseInt(tmdbData.release_date.substring(0, 4)) : null,
-                        overview: tmdbData.overview,
-                        genres: tmdbData.genres?.map(g => g.name) || [],
-                        is_niche: tmdbData.is_niche,
-                    };
-                } catch (e) {
-                    console.error(`Failed to hydrate movie ${item.tmdb_id}:`, e);
-                    return item;
-                }
-            })
-        );
+        const batchSize = 10;
+        const results: T[] = [];
+
+        for (let i = 0; i < items.length; i += batchSize) {
+            const batch = items.slice(i, i + batchSize);
+            const batchResults = await Promise.all(
+                batch.map(async (item) => {
+                    try {
+                        const tmdbData = await getMovieDetails(item.tmdb_id, 'fr-FR');
+                        return {
+                            ...item,
+                            title: tmdbData.title,
+                            poster_path: tmdbData.poster_path,
+                            release_year: tmdbData.release_date ? parseInt(tmdbData.release_date.substring(0, 4)) : null,
+                            overview: tmdbData.overview,
+                            genres: tmdbData.genres?.map(g => g.name) || [],
+                            is_niche: tmdbData.is_niche,
+                        } as T;
+                    } catch (e) {
+                        console.error(`Failed to hydrate movie ${item.tmdb_id}:`, e);
+                        return item;
+                    }
+                })
+            );
+            results.push(...batchResults);
+        }
+
+        return results;
     }
 
     return {
@@ -123,6 +133,67 @@ export async function getMovieService() {
 
             if (error || !data) return null;
             return data;
+        },
+
+        async getAllCandidatesPaginated(page = 1, pageSize = 50, genre?: string): Promise<{ data: TasteCandidate[], count: number }> {
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
+
+            // 1. Fetch joined data from DB to avoid TMDb calls during screening/filtering
+            // We fetch up to 1000 items to perform filtering on top candidates
+            const { data, error } = await supabase
+                .from('taste_candidates')
+                .select(`
+                    *,
+                    movies (
+                        title, 
+                        poster_path, 
+                        release_year,
+                        movie_features (genres, overview)
+                    )
+                `)
+                .order('taste_score', { ascending: false })
+                .limit(genre ? 1000 : 500);
+
+            if (error) throw error;
+
+            // 2. Map and Filter results using DB data
+            let candidates: TasteCandidate[] = (data || []).map((item: any) => {
+                const movies = item.movies;
+                // Supabase returns joined rows as arrays for 1-to-many relationships
+                const features = Array.isArray(movies?.movie_features)
+                    ? movies.movie_features[0]
+                    : movies?.movie_features;
+
+                return {
+                    ...item,
+                    title: movies?.title || item.title,
+                    poster_path: movies?.poster_path || item.poster_path,
+                    release_year: movies?.release_year || item.release_year,
+                    // DB genres are objects [{id, name}], mapped to string array
+                    genres: features?.genres?.map((g: any) => g.name) || [],
+                    overview: features?.overview || item.overview
+                };
+            });
+
+            if (genre) {
+                candidates = candidates.filter(c =>
+                    c.genres?.some(g => g.toLowerCase() === genre.toLowerCase())
+                );
+            }
+
+            // 3. Pagination slice
+            const paginatedItems = candidates.slice(from, to + 1);
+            const totalCount = genre ? candidates.length : 2000;
+
+            // 4. Batch-hydrate ONLY the results for the current page
+            // This ensures we have the latest French data and niche detection
+            const hydrated = await hydrateWithTMDb(paginatedItems);
+
+            return {
+                data: hydrated,
+                count: totalCount
+            };
         }
     }
 }

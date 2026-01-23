@@ -11,9 +11,9 @@ export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) 
                     <h2 className="text-lg font-black text-white tracking-tight uppercase">
                         Recommandations IA
                     </h2>
-                    <span className="text-zinc-500 text-[10px] font-black uppercase tracking-widest bg-base-300 px-2 py-0.5 rounded-full">
-                        Top {candidates.length}
-                    </span>
+                    <Link href="/recommandations" className="text-zinc-500 text-[9px] font-black uppercase tracking-widest hover:text-accent transition-colors underline decoration-zinc-500/30 underline-offset-4 cursor-pointer">
+                        Voir tout →
+                    </Link>
                 </div>
 
                 <div className="space-y-2">

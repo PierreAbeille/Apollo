@@ -29,4 +29,5 @@ export interface TasteCandidate {
     release_year?: number | null;
     overview?: string;
     genres?: string[];
+    is_niche?: boolean;
 }
