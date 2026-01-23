@@ -9,15 +9,12 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon, gradient }: StatCardProps) {
     return (
-        <div className={`relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-2xl p-6 transition-all hover:border-zinc-700 group`}>
-            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${gradient} opacity-5 blur-3xl group-hover:opacity-10 transition-opacity`} />
-
+        <div className={`relative overflow-hidden bg-base-200 border border-base-300 rounded-xl p-4 transition-all hover:border-zinc-700 shadow-sm`}>
             <div className="relative z-10">
-                <div className="text-2xl mb-2">{icon}</div>
-                <div className="text-4xl font-black text-white tracking-tighter mb-1">
+                <div className="text-3xl font-black text-white tracking-tighter">
                     {value.toLocaleString()}
                 </div>
-                <div className="text-zinc-500 text-sm font-medium uppercase tracking-wider">
+                <div className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1">
                     {label}
                 </div>
             </div>
@@ -27,24 +24,24 @@ export function StatCard({ label, value, icon, gradient }: StatCardProps) {
 
 export function StatsGrid({ stats }: { stats: { movies: number, interactions: number, candidates: number } }) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             <StatCard
-                label="Collection"
+                label="Films en Base"
                 value={stats.movies}
-                icon="📽️"
-                gradient="from-blue-500 to-cyan-500"
+                icon=""
+                gradient=""
             />
             <StatCard
-                label="Évaluations"
+                label="Notes Utilisateur"
                 value={stats.interactions}
-                icon="⭐"
-                gradient="from-amber-500 to-orange-500"
+                icon=""
+                gradient=""
             />
             <StatCard
-                label="IA Candidates"
+                label="Candidats IA"
                 value={stats.candidates}
-                icon="🧠"
-                gradient="from-purple-500 to-indigo-500"
+                icon=""
+                gradient=""
             />
         </div>
     );

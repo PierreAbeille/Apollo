@@ -55,7 +55,7 @@ export async function getMovieService() {
             return hydrateWithTMDb(data || []);
         },
 
-        async getRecentInteractions(limit = 5): Promise<Interaction[]> {
+        async getRecentInteractions(limit = 5): Promise<(Interaction & { title?: string })[]> {
             const { data, error } = await supabase
                 .from('interactions')
                 .select('*')
@@ -63,7 +63,7 @@ export async function getMovieService() {
                 .limit(limit)
 
             if (error) throw error
-            return data || []
+            return hydrateWithTMDb(data || []);
         },
 
         async getTopCandidates(limit = 5): Promise<TasteCandidate[]> {
