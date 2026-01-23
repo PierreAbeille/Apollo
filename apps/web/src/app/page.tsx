@@ -20,8 +20,14 @@ export default async function Page() {
   ]);
 
   return (
-    <div className="min-h-screen bg-base-100 text-base-content selection:bg-primary/30">
-      <main className="max-w-7xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-base-100 text-base-content selection:bg-primary/30 relative">
+      {/* Background Lighting Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-accent/10 blur-[140px] rounded-full animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[140px] rounded-full animate-pulse" style={{ animationDuration: '10s' }} />
+      </div>
+
+      <main className="relative z-10 max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
