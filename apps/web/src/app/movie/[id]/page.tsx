@@ -24,6 +24,12 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
         const mainCast = credits.cast.slice(0, 10);
         const releaseYear = movie.release_date ? movie.release_date.split('-')[0] : 'S.A';
 
+        const isNiche = !!movie.is_niche;
+        const accentColor = isNiche ? 'text-success' : 'text-accent';
+        const accentBg = isNiche ? 'bg-success/20' : 'bg-accent/20';
+        const accentBorder = isNiche ? 'border-success/20' : 'border-accent/20';
+        const accentFill = isNiche ? 'bg-success' : 'bg-accent';
+
         return (
             <main className="min-h-screen bg-base-100 text-zinc-100 pb-20">
                 {/* Hero Section with Backdrop */}
@@ -56,8 +62,13 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                     ← Retour au dashboard
                                 </Link>
                                 <div className="flex items-center gap-3 mb-2">
+                                    {isNiche && (
+                                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-success text-success-content rounded shadow-lg shadow-success/20">
+                                            Pépite Niche
+                                        </span>
+                                    )}
                                     {movie.genres?.map(g => (
-                                        <span key={g.id} className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 bg-accent/20 text-accent rounded-full border border-accent/20">
+                                        <span key={g.id} className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 ${accentBg} ${accentColor} rounded-full border ${accentBorder}`}>
                                             {g.name}
                                         </span>
                                     ))}
@@ -69,7 +80,7 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                     <span>{releaseYear}</span>
                                     {movie.runtime && <span>{Math.floor(movie.runtime / 60)}h {movie.runtime % 60}min</span>}
                                     <div className="flex items-center gap-2">
-                                        <span className="text-accent">★</span>
+                                        <span className={accentColor}>★</span>
                                         <span>{movie.vote_average.toFixed(1)}/10</span>
                                     </div>
                                     {director && (
@@ -97,7 +108,7 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                 {movie.overview || "Aucun synopsis disponible pour ce film."}
                             </p>
                             {movie.tagline && (
-                                <p className="text-accent italic font-medium text-lg">
+                                <p className={`${accentColor} italic font-medium text-lg`}>
                                     "{movie.tagline}"
                                 </p>
                             )}
@@ -136,7 +147,7 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                         {/* User Status Section */}
                         {interaction && (
                             <div className="bg-base-200 border border-base-300 rounded-2xl p-6 space-y-4 relative overflow-hidden group">
-                                <div className="absolute -top-12 -right-12 w-32 h-32 bg-primary/5 blur-3xl rounded-full" />
+                                <div className={`absolute -top-12 -right-12 w-32 h-32 ${isNiche ? 'bg-success/5' : 'bg-primary/5'} blur-3xl rounded-full`} />
                                 <h3 className="text-sm font-black text-white uppercase tracking-widest relative z-10">Ton Statut</h3>
 
                                 <div className="grid grid-cols-2 gap-4 relative z-10">
@@ -147,21 +158,21 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                     <div className="bg-base-100/50 p-3 rounded-xl border border-base-300/30 flex flex-col justify-center">
                                         <p className="text-[9px] font-black text-zinc-500 uppercase tracking-tighter mb-1">Actions</p>
                                         <div className="flex gap-2">
-                                            {interaction.is_wishlisted && <span className="w-2 h-2 bg-accent rounded-full animate-pulse" title="Dans la wishlist" />}
+                                            {interaction.is_wishlisted && <span className={`w-2 h-2 ${accentFill} rounded-full animate-pulse`} title="Dans la wishlist" />}
                                             {interaction.is_recommended && <span className="w-2 h-2 bg-info rounded-full" title="Recommandé" />}
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 pt-2 relative z-10">
-                                    {interaction.is_wishlisted && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-zinc-800 text-zinc-400 rounded">Wishlist</span>}
+                                    {interaction.is_wishlisted && <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-zinc-800 ${isNiche ? 'text-success' : 'text-accent'} rounded`}>Wishlist</span>}
                                     {interaction.is_recommended && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-info/10 text-info rounded border border-info/20">Recommandé</span>}
                                     {interaction.is_done && <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 bg-success/10 text-success rounded border border-success/20">Vu</span>}
                                 </div>
                             </div>
                         )}
                         <div className="bg-base-200 border border-base-300 rounded-2xl p-6 space-y-6 relative overflow-hidden group">
-                            <div className="absolute -top-12 -right-12 w-32 h-32 bg-accent/5 blur-3xl rounded-full" />
+                            <div className={`absolute -top-12 -right-12 w-32 h-32 ${isNiche ? 'bg-success/5' : 'bg-accent/5'} blur-3xl rounded-full`} />
 
                             <h3 className="text-sm font-black text-white uppercase tracking-widest relative z-10">Détails techniques</h3>
 
@@ -193,17 +204,17 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
 
                         {/* AI Insight Section */}
                         {aiInsight && (
-                            <div className="bg-base-200 border border-accent/30 rounded-2xl p-6 space-y-4 relative overflow-hidden group shadow-lg shadow-accent/5">
-                                <div className="absolute -top-12 -left-12 w-32 h-32 bg-accent/10 blur-3xl rounded-full" />
+                            <div className={`bg-base-200 border ${isNiche ? 'border-success/30' : 'border-accent/30'} rounded-2xl p-6 space-y-4 relative overflow-hidden group shadow-lg ${isNiche ? 'shadow-success/5' : 'shadow-accent/5'}`}>
+                                <div className={`absolute -top-12 -left-12 w-32 h-32 ${isNiche ? 'bg-success/10' : 'bg-accent/10'} blur-3xl rounded-full`} />
 
                                 <div className="flex items-center justify-between relative z-10">
                                     <h3 className="text-sm font-black text-white uppercase tracking-widest">Analyse Apollo AI</h3>
-                                    <div className="px-2 py-0.5 bg-accent text-accent-content text-[8px] font-black uppercase rounded">Batch v1</div>
+                                    <div className={`px-2 py-0.5 ${accentFill} ${isNiche ? 'text-success-content' : 'text-accent-content'} text-[8px] font-black uppercase rounded`}>Batch v1</div>
                                 </div>
 
                                 <div className="pt-2 relative z-10">
                                     <div className="flex items-end gap-1">
-                                        <span className="text-5xl font-black text-accent tracking-tighter leading-none">
+                                        <span className={`text-5xl font-black ${accentColor} tracking-tighter leading-none`}>
                                             {(aiInsight.taste_score * 100).toFixed(0)}%
                                         </span>
                                         <span className="text-xs font-black text-zinc-500 uppercase tracking-tighter mb-1">Match</span>
@@ -217,10 +228,10 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                 <div className="pt-2 space-y-2 relative z-10">
                                     <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest text-zinc-500">
                                         <span>Confiance IA</span>
-                                        <span className="text-accent">Élevée</span>
+                                        <span className={accentColor}>Élevée</span>
                                     </div>
                                     <div className="h-1 bg-base-300 rounded-full overflow-hidden">
-                                        <div className="h-full bg-accent w-[85%]" />
+                                        <div className={`h-full ${accentFill} w-[85%]`} />
                                     </div>
                                 </div>
                             </div>

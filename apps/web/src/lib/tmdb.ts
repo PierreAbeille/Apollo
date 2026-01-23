@@ -28,6 +28,7 @@ export interface TMDbMovie {
     homepage: string | null;
     genre_ids?: number[];
     genres?: { id: number; name: string }[];
+    is_niche?: boolean;
 }
 
 export interface TMDbCredits {
@@ -137,7 +138,27 @@ export async function getMovieDetails(movieId: number, language = "fr-FR"): Prom
         throw new Error(`TMDb API error: ${response.status}`);
     }
 
-    return response.json() as Promise<TMDbMovie>;
+    const data = await response.json() as TMDbMovie;
+
+    // Determine if niche: 
+    // 1. No French synopsis
+    // 2. Very low popularity and vote count
+    const hasFrOverview = !!data.overview;
+    data.is_niche = !hasFrOverview && (data.popularity < 5 || data.vote_count < 50);
+
+    // Fallback to English if overview is empty and language is French
+    if (!hasFrOverview && language === "fr-FR") {
+        const enUrl = buildUrl(`/movie/${movieId}`, { language: "en-US" });
+        const enResponse = await fetch(enUrl, { headers: getHeaders(), next: { revalidate: 86400 } });
+        if (enResponse.ok) {
+            const enData = await enResponse.json() as TMDbMovie;
+            if (enData.overview) {
+                data.overview = enData.overview;
+            }
+        }
+    }
+
+    return data;
 }
 
 export async function getMovieCredits(movieId: number, language = "fr-FR"): Promise<TMDbCredits> {

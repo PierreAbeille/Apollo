@@ -22,6 +22,7 @@ export async function getMovieService() {
                         release_year: tmdbData.release_date ? parseInt(tmdbData.release_date.substring(0, 4)) : null,
                         overview: tmdbData.overview,
                         genres: tmdbData.genres?.map(g => g.name) || [],
+                        is_niche: tmdbData.is_niche,
                     };
                 } catch (e) {
                     console.error(`Failed to hydrate movie ${item.tmdb_id}:`, e);

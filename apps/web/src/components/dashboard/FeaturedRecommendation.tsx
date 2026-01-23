@@ -59,11 +59,18 @@ export function FeaturedRecommendation({ initialCandidate }: { initialCandidate:
                     <div className={isLoading ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                             <div>
-                                <Link href={`/movie/${candidate.tmdb_id}`}>
-                                    <h3 className="text-2xl font-black text-white tracking-tight leading-none mb-1 hover:text-accent transition-colors cursor-pointer">
-                                        {candidate.title}
-                                    </h3>
-                                </Link>
+                                <div className="flex items-center gap-2 mb-1">
+                                    {(candidate as any).is_niche && (
+                                        <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 bg-success text-success-content rounded shrink-0">
+                                            Niche
+                                        </span>
+                                    )}
+                                    <Link href={`/movie/${candidate.tmdb_id}`}>
+                                        <h3 className="text-2xl font-black text-white tracking-tight leading-none hover:text-accent transition-colors cursor-pointer">
+                                            {candidate.title}
+                                        </h3>
+                                    </Link>
+                                </div>
                                 <p className="text-zinc-500 text-sm font-bold uppercase tracking-tighter">
                                     {candidate.release_year || 'S.A'}
                                 </p>

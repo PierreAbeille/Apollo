@@ -38,6 +38,10 @@
   --color-primary: var(--color-primary);
   --color-secondary: var(--color-secondary);
   --color-accent: var(--color-accent);
+  --color-success: var(--color-success);
+  --color-success-content: var(--color-success-content);
+  --color-info: var(--color-info);
+  --color-warning: var(--color-warning);
   --radius-xl: var(--radius-box);
 }
 
