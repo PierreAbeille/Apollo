@@ -33,10 +33,12 @@ def search_movie(query: str, language: str = "fr-FR"):
     return response.json()
 
 
-def get_movie_details(movie_id: int, language: str = "fr-FR"):
-    """Get detailed information about a movie."""
+def get_movie_details(movie_id: int, language: str = "fr-FR", append_to_response: str = None):
+    """Get detailed information about a movie, optionally including extra data."""
     url = f"{TMDB_BASE_URL}/movie/{movie_id}"
     params = {"language": language}
+    if append_to_response:
+        params["append_to_response"] = append_to_response
     response = requests.get(url, headers=get_headers(), params=params)
     response.raise_for_status()
     return response.json()
@@ -53,6 +55,32 @@ def get_movie_credits(movie_id: int):
 def get_popular_movies(language: str = "fr-FR", page: int = 1):
     """Get a list of popular movies."""
     url = f"{TMDB_BASE_URL}/movie/popular"
+    params = {"language": language, "page": page}
+    response = requests.get(url, headers=get_headers(), params=params)
+    response.raise_for_status()
+    return response.json()
+
+
+def get_movie_keywords(movie_id: int):
+    """Get keywords for a movie."""
+    url = f"{TMDB_BASE_URL}/movie/{movie_id}/keywords"
+    response = requests.get(url, headers=get_headers())
+    response.raise_for_status()
+    return response.json()
+
+
+def get_similar_movies(movie_id: int, language: str = "fr-FR", page: int = 1):
+    """Get movies similar to the given movie."""
+    url = f"{TMDB_BASE_URL}/movie/{movie_id}/similar"
+    params = {"language": language, "page": page}
+    response = requests.get(url, headers=get_headers(), params=params)
+    response.raise_for_status()
+    return response.json()
+
+
+def get_movie_recommendations(movie_id: int, language: str = "fr-FR", page: int = 1):
+    """Get TMDB recommendations for a movie."""
+    url = f"{TMDB_BASE_URL}/movie/{movie_id}/recommendations"
     params = {"language": language, "page": page}
     response = requests.get(url, headers=get_headers(), params=params)
     response.raise_for_status()

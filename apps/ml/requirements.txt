@@ -1,3 +1,5 @@
 python-dotenv
 psycopg2-binary
 requests
+sentence-transformers
+numpy

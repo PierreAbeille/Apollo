@@ -1,0 +1,43 @@
+"""Configuration settings for ML pipelines."""
+import os
+
+# Paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
+CACHE_DIR = os.path.join(DATA_DIR, "cache")
+LOGS_DIR = os.path.join(DATA_DIR, "logs")
+EMBEDDINGS_DIR = os.path.join(DATA_DIR, "embeddings")
+
+# Ensure directories exist
+os.makedirs(CACHE_DIR, exist_ok=True)
+os.makedirs(LOGS_DIR, exist_ok=True)
+os.makedirs(EMBEDDINGS_DIR, exist_ok=True)
+
+# Database
+DB_BATCH_SIZE = 100
+
+# TMDB
+TMDB_RATE_LIMIT_DELAY = 1.5  # seconds between API calls (safe limit for 50/min)
+TMDB_MAX_RETRIES = 3
+TMDB_TIMEOUT = 10  # seconds
+
+# Embeddings
+EMBEDDING_MODEL = "paraphrase-multilingual-MiniLM-L12-v2"
+EMBEDDING_BATCH_SIZE = 32
+
+# Recommendations
+MIN_RATING_FOR_SIMILAR = 8  # Fetch similar movies for ratings >= this
+SIMILAR_MOVIES_PER_FILM = 20  # How many similar movies to fetch per high-rated film
+MAX_TASTE_CANDIDATES = 2000  # Top N candidates to store
+NEW_CANDIDATE_BATCH_SIZE = 50  # Process new candidates in batches to manage memory
+
+# Letterboxd
+LETTERBOXD_CSV_PATH = os.path.join(RAW_DATA_DIR, "letterboxd", "letterboxd-data.csv")
+
+# Cache
+TMDB_CACHE_DB = os.path.join(CACHE_DIR, "tmdb_match.db")
+
+# Logs
+UNMATCHED_LOG = os.path.join(LOGS_DIR, "unmatched.csv")
+AMBIGUOUS_LOG = os.path.join(LOGS_DIR, "ambiguous.csv")
