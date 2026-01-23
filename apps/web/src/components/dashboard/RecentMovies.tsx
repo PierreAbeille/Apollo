@@ -1,4 +1,5 @@
 import { Movie } from '@/types/database';
+import Link from 'next/link';
 
 export function RecentMovies({ movies }: { movies: Movie[] }) {
     return (
@@ -15,9 +16,10 @@ export function RecentMovies({ movies }: { movies: Movie[] }) {
                 <div className="grid grid-cols-1 gap-2">
                     {movies.length > 0 ? (
                         movies.map((movie) => (
-                            <div
+                            <Link
                                 key={movie.tmdb_id}
-                                className="group flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-transparent hover:border-base-300 transition-all"
+                                href={`/movie/${movie.tmdb_id}`}
+                                className="group flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-transparent hover:border-base-300 transition-all cursor-pointer"
                             >
                                 <div className="flex-shrink-0 w-8 h-12 bg-base-300 rounded overflow-hidden border border-base-300">
                                     {movie.poster_path ? (
@@ -40,7 +42,7 @@ export function RecentMovies({ movies }: { movies: Movie[] }) {
                                         {movie.release_year || 'S.A'}
                                     </p>
                                 </div>
-                            </div>
+                            </Link>
                         ))
                     ) : (
                         <p className="text-zinc-600 font-bold uppercase tracking-widest text-[10px] py-4 text-center">Aucun import</p>

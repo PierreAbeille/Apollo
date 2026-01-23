@@ -3,6 +3,7 @@
 import { TasteCandidate } from '@/types/database';
 import { getRandomMovieAction } from '@/services/actions';
 import { useState } from 'react';
+import Link from 'next/link';
 
 export function FeaturedRecommendation({ initialCandidate }: { initialCandidate: TasteCandidate | null }) {
     const [candidate, setCandidate] = useState<TasteCandidate | null>(initialCandidate);
@@ -36,7 +37,7 @@ export function FeaturedRecommendation({ initialCandidate }: { initialCandidate:
                 />
 
                 {/* Poster - Fixed to take full height and remove padding */}
-                <div className="relative z-10 w-full md:w-48 h-72 md:h-auto flex-shrink-0 bg-base-300 overflow-hidden">
+                <Link href={`/movie/${candidate.tmdb_id}`} className="relative z-10 w-full md:w-48 h-72 md:h-auto flex-shrink-0 bg-base-300 overflow-hidden cursor-pointer">
                     {candidate.poster_path ? (
                         <img
                             src={`https://image.tmdb.org/t/p/w342${candidate.poster_path}`}
@@ -51,16 +52,18 @@ export function FeaturedRecommendation({ initialCandidate }: { initialCandidate:
                     <div className="absolute top-4 left-4 bg-accent text-accent-content text-[9px] font-black px-2 py-1 rounded-md shadow-xl uppercase tracking-widest">
                         À la une
                     </div>
-                </div>
+                </Link>
 
                 {/* Content */}
                 <div className="relative z-10 flex-1 p-6 flex flex-col justify-between">
                     <div className={isLoading ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
                         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                             <div>
-                                <h3 className="text-2xl font-black text-white tracking-tight leading-none mb-1">
-                                    {candidate.title}
-                                </h3>
+                                <Link href={`/movie/${candidate.tmdb_id}`}>
+                                    <h3 className="text-2xl font-black text-white tracking-tight leading-none mb-1 hover:text-accent transition-colors cursor-pointer">
+                                        {candidate.title}
+                                    </h3>
+                                </Link>
                                 <p className="text-zinc-500 text-sm font-bold uppercase tracking-tighter">
                                     {candidate.release_year || 'S.A'}
                                 </p>

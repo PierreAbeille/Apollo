@@ -21,8 +21,28 @@ export interface TMDbMovie {
     vote_average: number;
     vote_count: number;
     popularity: number;
+    runtime: number | null;
+    budget: number;
+    revenue: number;
+    tagline: string | null;
+    homepage: string | null;
     genre_ids?: number[];
     genres?: { id: number; name: string }[];
+}
+
+export interface TMDbCredits {
+    id: number;
+    cast: {
+        id: number;
+        name: string;
+        character: string;
+        profile_path: string | null;
+    }[];
+    crew: {
+        id: number;
+        name: string;
+        job: string;
+    }[];
 }
 
 export interface TMDbSearchResponse {
@@ -118,6 +138,23 @@ export async function getMovieDetails(movieId: number, language = "fr-FR"): Prom
     }
 
     return response.json() as Promise<TMDbMovie>;
+}
+
+export async function getMovieCredits(movieId: number, language = "fr-FR"): Promise<TMDbCredits> {
+    const url = buildUrl(`/movie/${movieId}/credits`, {
+        language
+    });
+
+    const response = await fetch(url, {
+        headers: getHeaders(),
+        next: { revalidate: 86400 },
+    });
+
+    if (!response.ok) {
+        throw new Error(`TMDb API error: ${response.status}`);
+    }
+
+    return response.json() as Promise<TMDbCredits>;
 }
 
 export function getImageUrl(

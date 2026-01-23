@@ -100,6 +100,28 @@ export async function getMovieService() {
 
             const hydrated = await hydrateWithTMDb([data]);
             return hydrated[0];
+        },
+
+        async getAIInsight(tmdbId: number): Promise<TasteCandidate | null> {
+            const { data, error } = await supabase
+                .from('taste_candidates')
+                .select('*')
+                .eq('tmdb_id', tmdbId)
+                .maybeSingle();
+
+            if (error || !data) return null;
+            return data;
+        },
+
+        async getInteraction(tmdbId: number): Promise<Interaction | null> {
+            const { data, error } = await supabase
+                .from('interactions')
+                .select('*')
+                .eq('tmdb_id', tmdbId)
+                .maybeSingle();
+
+            if (error || !data) return null;
+            return data;
         }
     }
 }

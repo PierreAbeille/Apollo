@@ -1,4 +1,5 @@
 import { Interaction } from '@/types/database';
+import Link from 'next/link';
 
 export function RecentInteractions({ interactions }: { interactions: Interaction[] }) {
     return (
@@ -15,9 +16,10 @@ export function RecentInteractions({ interactions }: { interactions: Interaction
                 <div className="space-y-2">
                     {interactions.length > 0 ? (
                         interactions.map((it) => (
-                            <div
+                            <Link
                                 key={it.id}
-                                className="flex items-center justify-between p-3 rounded-lg bg-base-100 border border-base-300/30 hover:border-base-300 transition-all"
+                                href={`/movie/${it.tmdb_id}`}
+                                className="flex items-center justify-between p-3 rounded-lg bg-base-100 border border-base-300/30 hover:border-base-300 transition-all cursor-pointer"
                             >
                                 <div className="flex items-center gap-3 min-w-0">
                                     <div className="w-1.5 h-6 bg-base-300 rounded-full overflow-hidden">
@@ -41,7 +43,7 @@ export function RecentInteractions({ interactions }: { interactions: Interaction
                                 <div className="text-[9px] font-black text-zinc-600 uppercase tracking-tighter text-right ml-4 shrink-0">
                                     {new Date(it.created_at).toLocaleDateString('fr-FR')}
                                 </div>
-                            </div>
+                            </Link>
                         ))
                     ) : (
                         <p className="text-zinc-600 font-bold uppercase tracking-widest text-[10px] py-4 text-center">Aucune activité</p>

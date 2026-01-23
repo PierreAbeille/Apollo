@@ -1,4 +1,5 @@
 import { TasteCandidate } from '@/types/database';
+import Link from 'next/link';
 
 export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) {
     return (
@@ -18,9 +19,10 @@ export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) 
                 <div className="space-y-2">
                     {candidates.length > 0 ? (
                         candidates.map((candidate, idx) => (
-                            <div
+                            <Link
                                 key={candidate.id}
-                                className="group flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-transparent hover:border-base-300 transition-all cursor-default"
+                                href={`/movie/${candidate.tmdb_id}`}
+                                className="group flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-transparent hover:border-base-300 transition-all cursor-pointer"
                             >
                                 <div className="flex-shrink-0 w-10 h-14 bg-base-300 rounded overflow-hidden border border-base-300 relative">
                                     {candidate.poster_path ? (
@@ -56,7 +58,7 @@ export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) 
                                         Match
                                     </div>
                                 </div>
-                            </div>
+                            </Link>
                         ))
                     ) : (
                         <div className="py-8 text-center">
@@ -65,6 +67,6 @@ export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) 
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
