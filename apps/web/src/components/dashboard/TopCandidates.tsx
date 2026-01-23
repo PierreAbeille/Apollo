@@ -2,8 +2,8 @@ import { TasteCandidate } from '@/types/database';
 
 export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) {
     return (
-        <div className="bg-base-200 border border-base-300 rounded-xl p-5 h-full shadow-sm relative overflow-hidden group">
-            <div className="absolute -top-24 -left-24 w-64 h-64 bg-accent/5 blur-[100px] rounded-full pointer-events-none group-hover:bg-accent/10 transition-colors duration-700" />
+        <div className="bg-base-200 border border-base-300 rounded-xl p-5 h-full shadow-sm relative overflow-hidden group/main">
+            <div className="absolute -top-24 -left-24 w-64 h-64 bg-accent/5 blur-[100px] rounded-full pointer-events-none group-hover/main:bg-accent/10 transition-colors duration-700" />
 
             <div className="relative z-10">
                 <div className="flex items-center justify-between mb-5">
