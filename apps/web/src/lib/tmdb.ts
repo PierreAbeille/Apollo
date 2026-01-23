@@ -62,11 +62,13 @@ function buildUrl(endpoint: string, params?: Record<string, string>): string {
 
 export async function searchMovies(
     query: string,
-    page = 1
+    page = 1,
+    language = "fr-FR"
 ): Promise<TMDbSearchResponse> {
     const url = buildUrl("/search/movie", {
         query,
         page: String(page),
+        language,
         include_adult: "false",
     });
 
@@ -82,9 +84,10 @@ export async function searchMovies(
     return response.json() as Promise<TMDbSearchResponse>;
 }
 
-export async function getPopularMovies(page = 1): Promise<TMDbSearchResponse> {
+export async function getPopularMovies(page = 1, language = "fr-FR"): Promise<TMDbSearchResponse> {
     const url = buildUrl("/movie/popular", {
         page: String(page),
+        language,
     });
 
     const response = await fetch(url, {
@@ -99,8 +102,10 @@ export async function getPopularMovies(page = 1): Promise<TMDbSearchResponse> {
     return response.json() as Promise<TMDbSearchResponse>;
 }
 
-export async function getMovieDetails(movieId: number): Promise<TMDbMovie> {
-    const url = buildUrl(`/movie/${movieId}`);
+export async function getMovieDetails(movieId: number, language = "fr-FR"): Promise<TMDbMovie> {
+    const url = buildUrl(`/movie/${movieId}`, {
+        language
+    });
 
     const response = await fetch(url, {
         headers: getHeaders(),

@@ -1,151 +1,95 @@
-import { createClient } from '@/utils/supabase/server'
-import { cookies } from 'next/headers'
+import { getMovieService } from '@/services/movie-service';
+import { StatsGrid } from '@/components/dashboard/StatsGrid';
+import { RecentMovies } from '@/components/dashboard/RecentMovies';
+import { RecentInteractions } from '@/components/dashboard/RecentInteractions';
+import { TopCandidates } from '@/components/dashboard/TopCandidates';
 
-interface Movie {
-  tmdb_id: number;
-  title: string;
-  release_year: number | null;
-  poster_path: string | null;
-  updated_at: string;
-}
-
-interface Interaction {
-  id: number;
-  tmdb_id: number;
-  rating: number | null;
-  is_done: boolean;
-  is_wishlisted: boolean;
-  is_recommended: boolean;
-  source: string;
-  created_at: string;
-}
-
-interface TasteCandidate {
-  id: number;
-  tmdb_id: number;
-  taste_score: number;
-  model_version: string;
-  generated_at: string;
-}
-
-async function getStats(supabase: ReturnType<typeof createClient>) {
-  const [moviesRes, interactionsRes, candidatesRes, historyRes] = await Promise.all([
-    supabase.from('movies').select('*', { count: 'exact', head: true }),
-    supabase.from('interactions').select('*', { count: 'exact', head: true }),
-    supabase.from('taste_candidates').select('*', { count: 'exact', head: true }),
-    supabase.from('recommendation_history').select('*', { count: 'exact', head: true }),
-  ]);
-
-  return {
-    movies: moviesRes.count ?? 0,
-    interactions: interactionsRes.count ?? 0,
-    candidates: candidatesRes.count ?? 0,
-    history: historyRes.count ?? 0,
-  };
-}
+export const dynamic = 'force-dynamic';
 
 export default async function Page() {
-  const cookieStore = await cookies()
-  const supabase = createClient(cookieStore)
+  const movieService = await getMovieService();
 
-  const stats = await getStats(supabase);
-
-  const { data: recentMovies } = await supabase
-    .from('movies')
-    .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(5);
-
-  const { data: recentInteractions } = await supabase
-    .from('interactions')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  const { data: topCandidates } = await supabase
-    .from('taste_candidates')
-    .select('*')
-    .order('taste_score', { ascending: false })
-    .limit(5);
+  // Parallel fetching for performance
+  const [stats, recentMovies, recentInteractions, topCandidates] = await Promise.all([
+    movieService.getStats(),
+    movieService.getRecentMovies(6),
+    movieService.getRecentInteractions(5),
+    movieService.getTopCandidates(8),
+  ]);
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-zinc-100 p-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold">🎬 Apollo — Movie Reco Dashboard</h1>
-        <p className="text-zinc-400 mt-2">PoC Dashboard for movie recommendations</p>
-      </header>
-
-      {/* Stats Grid */}
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Movies" value={stats.movies} />
-        <StatCard label="Interactions" value={stats.interactions} />
-        <StatCard label="Taste Candidates" value={stats.candidates} />
-        <StatCard label="Reco History" value={stats.history} />
-      </section>
-
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Recent Movies */}
-        <section className="bg-zinc-800 rounded-lg p-4">
-          <h2 className="text-xl font-semibold mb-4">📽️ Recent Movies</h2>
-          {recentMovies && recentMovies.length > 0 ? (
-            <ul className="space-y-2">
-              {recentMovies.map((movie: Movie) => (
-                <li key={movie.tmdb_id} className="p-2 bg-zinc-700 rounded">
-                  <span className="font-medium">{movie.title}</span>
-                  <span className="text-zinc-400 ml-2">({movie.release_year ?? 'N/A'})</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-zinc-500">No movies yet</p>
-          )}
-        </section>
-
-        {/* Recent Interactions */}
-        <section className="bg-zinc-800 rounded-lg p-4">
-          <h2 className="text-xl font-semibold mb-4">⭐ Recent Interactions</h2>
-          {recentInteractions && recentInteractions.length > 0 ? (
-            <ul className="space-y-2">
-              {recentInteractions.map((interaction: Interaction) => (
-                <li key={interaction.id} className="p-2 bg-zinc-700 rounded text-sm">
-                  <span>TMDB: {interaction.tmdb_id}</span>
-                  {interaction.rating && <span className="ml-2">⭐ {interaction.rating}</span>}
-                  {interaction.is_done && <span className="ml-2 text-green-400">✓ Done</span>}
-                  {interaction.is_wishlisted && <span className="ml-2 text-yellow-400">♡ Wishlist</span>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-zinc-500">No interactions yet</p>
-          )}
-        </section>
-
-        {/* Top Taste Candidates */}
-        <section className="bg-zinc-800 rounded-lg p-4">
-          <h2 className="text-xl font-semibold mb-4">🎯 Top Taste Candidates</h2>
-          {topCandidates && topCandidates.length > 0 ? (
-            <ul className="space-y-2">
-              {topCandidates.map((candidate: TasteCandidate) => (
-                <li key={candidate.id} className="p-2 bg-zinc-700 rounded flex justify-between">
-                  <span>TMDB: {candidate.tmdb_id}</span>
-                  <span className="text-green-400">{candidate.taste_score.toFixed(2)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-zinc-500">No candidates yet</p>
-          )}
-        </section>
+    <div className="min-h-screen bg-black text-white selection:bg-indigo-500/30">
+      {/* Background Decor */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
       </div>
-    </div>
-  )
-}
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-zinc-800 rounded-lg p-4 text-center">
-      <p className="text-3xl font-bold">{value}</p>
-      <p className="text-zinc-400 text-sm">{label}</p>
+      <main className="relative z-10 max-w-7xl mx-auto px-6 py-12 lg:py-20">
+        {/* Header */}
+        <header className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="h-0.5 w-12 bg-indigo-500 rounded-full" />
+              <span className="text-zinc-500 font-black uppercase tracking-[0.3em] text-xs">Intelligence Cinématographique</span>
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-white">
+              Apollo<span className="text-indigo-500">.</span>
+            </h1>
+          </div>
+
+          <div className="text-left md:text-right">
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-[10px] mb-2">Statut du Système</p>
+            <div className="flex items-center md:justify-end gap-2">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs font-black text-emerald-500 uppercase tracking-tighter">Opérationnel</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Stats Section */}
+        <StatsGrid stats={stats} />
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Left Column: Recommendations */}
+          <div className="lg:col-span-4 h-full">
+            <TopCandidates candidates={topCandidates} />
+          </div>
+
+          {/* Right Column: Activity & Library */}
+          <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <RecentMovies movies={recentMovies} />
+            <RecentInteractions interactions={recentInteractions} />
+
+            {/* Quick Action / Info Card */}
+            <div className="md:col-span-2 bg-gradient-to-br from-indigo-600 to-blue-700 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-8 shadow-2xl shadow-indigo-500/20">
+              <div>
+                <h3 className="text-2xl font-black text-white tracking-tight mb-2">Prêt pour plus ?</h3>
+                <p className="text-indigo-100/70 font-medium max-w-md">
+                  Le pipeline ML analyse tes goûts pour découvrir les pépites qui manquent à ta collection.
+                </p>
+              </div>
+              <button disabled className="bg-white text-indigo-600 px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-transform opacity-50 cursor-not-allowed">
+                Bientôt Disponible
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-32 pt-12 border-t border-zinc-900 flex flex-col md:flex-row justify-between items-center gap-6 text-zinc-600">
+          <p className="text-sm font-bold tracking-tight">© 2026 Apollo Intelligence. Tous droits réservés.</p>
+          <div className="flex gap-8 text-[10px] font-black uppercase tracking-[0.2em]">
+            <span className="hover:text-zinc-400 cursor-pointer transition-colors">Système</span>
+            <span className="hover:text-zinc-400 cursor-pointer transition-colors">Algorithme</span>
+            <span className="hover:text-zinc-400 cursor-pointer transition-colors">Confidentialité</span>
+          </div>
+        </footer>
+      </main>
     </div>
-  )
+  );
 }
