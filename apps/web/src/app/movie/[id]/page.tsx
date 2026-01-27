@@ -1,5 +1,6 @@
 import { getMovieDetails, getMovieCredits, getImageUrl } from '@/lib/tmdb';
 import { getMovieService } from '@/services/movie-service';
+import { MoodAnalyzerCard } from '@/components/recommendations/MoodAnalyzerCard';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -13,11 +14,12 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
 
     try {
         const service = await getMovieService();
-        const [movie, credits, aiInsight, interaction] = await Promise.all([
+        const [movie, credits, aiInsight, interaction, moodScores] = await Promise.all([
             getMovieDetails(movieId),
             getMovieCredits(movieId),
             service.getAIInsight(movieId),
-            service.getInteraction(movieId)
+            service.getInteraction(movieId),
+            service.getMoodScoresForMovie(movieId)
         ]);
 
         const director = credits.crew.find(c => c.job === 'Director');
@@ -201,6 +203,11 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                 )}
                             </div>
                         </div>
+
+                        {/* Mood Analyzer Card */}
+                        {moodScores && moodScores.length > 0 && (
+                            <MoodAnalyzerCard moodScores={moodScores} isNiche={isNiche} />
+                        )}
 
                         {/* AI Insight Section */}
                         {aiInsight && (

@@ -7,15 +7,15 @@ import { Suspense } from 'react';
 export default async function RecommandationsPage({
     searchParams
 }: {
-    searchParams: Promise<{ page?: string; genre?: string }>
+    searchParams: Promise<{ page?: string; mood?: string }>
 }) {
     const params = await searchParams;
     const currentPage = parseInt(params.page || '1');
-    const genre = params.genre;
+    const moodId = params.mood;
     const pageSize = 50;
 
     const service = await getMovieService();
-    const { data: candidates, count } = await service.getAllCandidatesPaginated(currentPage, pageSize, genre);
+    const { data: candidates, count } = await service.getAllCandidatesPaginated(currentPage, pageSize, moodId);
 
     const totalPages = Math.ceil(count / pageSize);
 
@@ -148,7 +148,7 @@ export default async function RecommandationsPage({
                 <div className="flex items-center justify-center gap-2">
                     {currentPage > 1 && (
                         <Link
-                            href={`/recommandations?page=${currentPage - 1}${genre ? `&genre=${genre}` : ''}`}
+                            href={`/recommandations?page=${currentPage - 1}${moodId ? `&mood=${moodId}` : ''}`}
                             className="px-6 py-3 bg-base-200 border border-base-300 rounded-xl text-xs font-black uppercase tracking-widest hover:border-accent transition-colors"
                         >
                             Précédent
@@ -156,7 +156,7 @@ export default async function RecommandationsPage({
                     )}
                     {currentPage < totalPages && (
                         <Link
-                            href={`/recommandations?page=${currentPage + 1}${genre ? `&genre=${genre}` : ''}`}
+                            href={`/recommandations?page=${currentPage + 1}${moodId ? `&mood=${moodId}` : ''}`}
                             className="px-6 py-3 bg-base-200 border border-base-300 rounded-xl text-xs font-black uppercase tracking-widest hover:border-accent transition-colors"
                         >
                             Suivant

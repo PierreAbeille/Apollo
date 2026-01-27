@@ -17,6 +17,12 @@ export interface Interaction {
     created_at: string;
 }
 
+export interface MoodScore {
+    mood_id: string;
+    mood_name: string;
+    similarity_score: number;
+}
+
 export interface TasteCandidate {
     id: number;
     tmdb_id: number;
@@ -30,4 +36,6 @@ export interface TasteCandidate {
     overview?: string;
     genres?: string[];
     is_niche?: boolean;
+    mood_scores?: MoodScore[];
 }
+

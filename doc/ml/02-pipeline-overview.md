@@ -52,12 +52,25 @@ flowchart TD
     
     P04 --> DB3[(PostgreSQL: taste_candidates)]
     
+    Cache --> P05
+    
+    subgraph P05["Pipeline 05: Build Mood Scores"]
+        E1[18 Moods config] --> E2[Encoder moods]
+        E2 --> E3[Cosine similarity]
+        E3 --> E4[Filtrer seuil 15%]
+        E4 --> E5[Insérer movie_mood_scores]
+    end
+    
+    P05 --> DB4[(PostgreSQL: moods + movie_mood_scores)]
+    
     DB3 --> WebApp[Application Web Next.js]
+    DB4 --> WebApp
     
     style P01 fill:#4f46e5,color:#fff
     style P02 fill:#7c3aed,color:#fff
     style P03 fill:#db2777,color:#fff
     style P04 fill:#dc2626,color:#fff
+    style P05 fill:#ea580c,color:#fff
     style WebApp fill:#059669,color:#fff
 ```
 
@@ -71,6 +84,7 @@ flowchart TD
 | **02** | `movies` (tmdb_id) | `movie_features` | 5-15 min | TMDb Details |
 | **03** | `movie_features.text_for_embedding` | `embeddings.npy` | 1-3 min | Aucun |
 | **04** | `interactions` + embeddings | `taste_candidates` | 10-20 min | TMDb Similar |
+| **05** | `config/moods.py` + embeddings | `movie_mood_scores` | < 1 min | Aucun |
 
 **Temps total première exécution** : ~20-40 minutes (selon nombre de films et connexion)
 
@@ -116,9 +130,10 @@ python pipelines/04_build_taste_candidates_full.py
 ## 🧩 Dépendances Entre Pipelines
 
 ```
-01 ──┬──► 02 ──► 03 ──┐
-     │                 ├──► 04
-     └─────────────────┘
+01 ──┬──► 02 ──► 03 ──┬──► 04
+     │                 │
+     │                 └──► 05
+     └─────────────────────┘
 ```
 
 **Explication** :
@@ -126,6 +141,7 @@ python pipelines/04_build_taste_candidates_full.py
 - **02** dépend de **01** (besoin des tmdb_id)
 - **03** dépend de **02** (besoin de text_for_embedding)
 - **04** dépend de **01** (interactions) ET **03** (embeddings)
+- **05** dépend de **03** uniquement (embeddings films)
 
 **⚠️ Important** : Ne jamais sauter d'étapes lors de la première exécution.
 

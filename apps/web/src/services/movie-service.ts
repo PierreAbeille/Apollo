@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
-import { Movie, Interaction, TasteCandidate } from '@/types/database'
+import { Movie, Interaction, TasteCandidate, MoodScore } from '@/types/database'
 import { getMovieDetails } from '@/lib/tmdb'
 
 export async function getMovieService() {
@@ -135,12 +135,58 @@ export async function getMovieService() {
             return data;
         },
 
-        async getAllCandidatesPaginated(page = 1, pageSize = 50, genre?: string): Promise<{ data: TasteCandidate[], count: number }> {
+        async getAllCandidatesPaginated(page = 1, pageSize = 50, moodId?: string): Promise<{ data: TasteCandidate[], count: number }> {
             const from = (page - 1) * pageSize;
-            const to = from + pageSize - 1;
 
-            // 1. Fetch joined data from DB to avoid TMDb calls during screening/filtering
-            // We fetch up to 1000 items to perform filtering on top candidates
+            // If mood is selected, we filter and sort by mood similarity score
+            if (moodId) {
+                // Get count first
+                const { data: countResult, error: countError } = await supabase
+                    .rpc('count_candidates_by_mood', {
+                        p_mood_id: moodId,
+                        p_min_score: 0.15
+                    });
+
+                if (countError) throw countError;
+
+                // Get paginated results using RPC
+                const { data, error } = await supabase
+                    .rpc('get_candidates_by_mood', {
+                        p_mood_id: moodId,
+                        p_min_score: 0.15,
+                        p_limit: pageSize,
+                        p_offset: from
+                    });
+
+                if (error) throw error;
+
+                // Map RPC results to TasteCandidate format
+                const candidates: TasteCandidate[] = (data || []).map((item: any) => ({
+                    id: item.id,
+                    tmdb_id: item.tmdb_id,
+                    taste_score: item.taste_score,
+                    model_version: item.model_version,
+                    generated_at: item.generated_at,
+                    title: item.title,
+                    poster_path: item.poster_path,
+                    release_year: item.release_year,
+                    mood_scores: [{
+                        mood_id: moodId,
+                        mood_name: moodId,
+                        similarity_score: item.similarity_score
+                    }]
+                }));
+
+                // Batch-hydrate the page
+                const hydrated = await hydrateWithTMDb(candidates);
+
+                return {
+                    data: hydrated,
+                    count: countResult || 0
+                };
+            }
+
+            // No mood filter - original behavior
             const { data, error } = await supabase
                 .from('taste_candidates')
                 .select(`
@@ -153,14 +199,13 @@ export async function getMovieService() {
                     )
                 `)
                 .order('taste_score', { ascending: false })
-                .limit(genre ? 1000 : 500);
+                .range(from, from + pageSize - 1);
 
             if (error) throw error;
 
-            // 2. Map and Filter results using DB data
+            // Map results
             let candidates: TasteCandidate[] = (data || []).map((item: any) => {
                 const movies = item.movies;
-                // Supabase returns joined rows as arrays for 1-to-many relationships
                 const features = Array.isArray(movies?.movie_features)
                     ? movies.movie_features[0]
                     : movies?.movie_features;
@@ -170,30 +215,50 @@ export async function getMovieService() {
                     title: movies?.title || item.title,
                     poster_path: movies?.poster_path || item.poster_path,
                     release_year: movies?.release_year || item.release_year,
-                    // DB genres are objects [{id, name}], mapped to string array
                     genres: features?.genres?.map((g: any) => g.name) || [],
                     overview: features?.overview || item.overview
                 };
             });
 
-            if (genre) {
-                candidates = candidates.filter(c =>
-                    c.genres?.some(g => g.toLowerCase() === genre.toLowerCase())
-                );
-            }
-
-            // 3. Pagination slice
-            const paginatedItems = candidates.slice(from, to + 1);
-            const totalCount = genre ? candidates.length : 2000;
-
-            // 4. Batch-hydrate ONLY the results for the current page
-            // This ensures we have the latest French data and niche detection
-            const hydrated = await hydrateWithTMDb(paginatedItems);
+            // Batch-hydrate the page
+            const hydrated = await hydrateWithTMDb(candidates);
 
             return {
                 data: hydrated,
-                count: totalCount
+                count: 2000  // Total candidates
             };
+        },
+
+        async getMoodScoresForMovie(tmdbId: number): Promise<MoodScore[]> {
+            const { data, error } = await supabase
+                .from('movie_mood_scores')
+                .select(`
+                    mood_id,
+                    similarity_score,
+                    moods (name)
+                `)
+                .eq('tmdb_id', tmdbId)
+                .gte('similarity_score', 0.15)
+                .order('similarity_score', { ascending: false })
+                .limit(5);
+
+            if (error) throw error;
+
+            return (data || []).map((item: any) => ({
+                mood_id: item.mood_id,
+                mood_name: item.moods?.name || item.mood_id,
+                similarity_score: item.similarity_score
+            }));
+        },
+
+        async getAllMoods(): Promise<{ id: string; name: string }[]> {
+            const { data, error } = await supabase
+                .from('moods')
+                .select('id, name')
+                .order('name');
+
+            if (error) throw error;
+            return data || [];
         }
     }
 }

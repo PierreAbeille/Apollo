@@ -290,3 +290,65 @@ class DatabaseClient:
             LIMIT %s
         """
         return self.fetch_all(query, (limit,))
+    
+    # =========================================================================
+    # Mood Operations
+    # =========================================================================
+    
+    def upsert_mood(
+        self,
+        mood_id: str,
+        name: str,
+        description: str,
+        embedding: list[float]
+    ) -> None:
+        """
+        Insert or update a mood with its embedding.
+        
+        Args:
+            mood_id: Unique mood identifier
+            name: Display name
+            description: Semantic description
+            embedding: Embedding vector as list of floats
+        """
+        query = """
+            INSERT INTO moods (id, name, description, embedding)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id)
+            DO UPDATE SET
+                name = EXCLUDED.name,
+                description = EXCLUDED.description,
+                embedding = EXCLUDED.embedding
+        """
+        self.execute(query, (mood_id, name, description, embedding))
+    
+    def clear_movie_mood_scores(self) -> None:
+        """Clear all existing movie mood scores."""
+        self.execute("DELETE FROM movie_mood_scores")
+    
+    def insert_movie_mood_scores(self, scores: list[tuple[int, str, float]]) -> None:
+        """
+        Insert multiple movie mood scores.
+        
+        Args:
+            scores: List of (tmdb_id, mood_id, similarity_score) tuples
+        """
+        if not scores:
+            return
+        
+        # Build batch insert query
+        values = []
+        params = []
+        for tmdb_id, mood_id, score in scores:
+            values.append("(%s, %s, %s)")
+            params.extend([tmdb_id, mood_id, score])
+        
+        query = f"""
+            INSERT INTO movie_mood_scores (tmdb_id, mood_id, similarity_score)
+            VALUES {', '.join(values)}
+            ON CONFLICT (tmdb_id, mood_id)
+            DO UPDATE SET similarity_score = EXCLUDED.similarity_score
+        """
+        
+        self.execute(query, tuple(params))
+
