@@ -110,10 +110,10 @@ export default async function RecommandationsPage({
                                                 <td className="p-4 text-right">
                                                     <div className="inline-flex flex-col items-end">
                                                         <span className={`text-xl font-black ${accentColor} tracking-tighter leading-none`}>
-                                                            {(movie.taste_score * 100).toFixed(0)}%
+                                                            {movie.taste_score_formatted}
                                                         </span>
                                                         <div className="w-full h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
-                                                            <div className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`} style={{ width: `${movie.taste_score * 100}%` }} />
+                                                            <div className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`} style={{ width: `${movie.taste_score * 10}%` }} />
                                                         </div>
                                                     </div>
                                                 </td>

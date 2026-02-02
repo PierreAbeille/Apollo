@@ -52,7 +52,7 @@ export function TopCandidates({ candidates }: { candidates: TasteCandidate[] }) 
 
                                 <div className="flex flex-col items-end">
                                     <div className="text-lg font-black text-accent tracking-tighter group-hover:scale-105 transition-transform">
-                                        {(candidate.taste_score * 100).toFixed(0)}%
+                                        {candidate.taste_score_formatted}
                                     </div>
                                     <div className="text-[8px] text-zinc-600 font-black uppercase tracking-tighter">
                                         Match

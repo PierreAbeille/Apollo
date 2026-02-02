@@ -55,15 +55,17 @@ from features.centroid_features import (
     compute_centroid_features,
     get_centroid_feature_names,
     save_centroids,
-    DEFAULT_N_CLUSTERS,
 )
 from embeddings.similarity import cosine_similarity
+
+
+DEFAULT_REGRESSION_CLUSTERS = 4
 
 
 class TrainingDatasetBuilder:
     """Builds training dataset for XGBoost from DB and embeddings."""
 
-    def __init__(self, n_clusters: int = DEFAULT_N_CLUSTERS):
+    def __init__(self, n_clusters: int = DEFAULT_REGRESSION_CLUSTERS):
         """Initialize builder."""
         self.db = DatabaseClient()
         self.n_clusters = n_clusters
@@ -100,31 +102,20 @@ class TrainingDatasetBuilder:
         
         return embeddings, tmdb_to_index
 
-    def _get_label(self, interaction: dict) -> Optional[int]:
+    def _get_label(self, interaction: dict) -> Optional[float]:
         """
-        Determine label from interaction.
+        Determine label from interaction for regression.
+        Uses raw rating 1-10.
         
         Returns:
-            1 (positive), 0 (negative), or None (ignore)
+            Rating (float) or None if not rated
         """
-        is_done = interaction.get("is_done", False)
         rating = interaction.get("rating")
         
-        # Must be watched to have a label
-        if not is_done:
-            return None
-        
-        # Must have a rating
         if rating is None:
             return None
-        
-        # Apply thresholds
-        if rating >= POSITIVE_RATING_THRESHOLD:
-            return 1
-        elif rating <= NEGATIVE_RATING_THRESHOLD:
-            return 0
-        else:
-            return None  # 6-7 range, ambiguous
+            
+        return float(rating)
 
     def _build_vocabularies(self, movie_features: List[dict]) -> None:
         """Build vocabularies for genres, keywords, and languages."""
@@ -296,7 +287,7 @@ class TrainingDatasetBuilder:
             # Generate version and save centroids
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.centroids_version = f"centroids_v{timestamp}"
+            self.centroids_version = f"centroids_reg_k{self.n_clusters}_{timestamp}"
             centroids_path = save_centroids(
                 self.positive_centroids, 
                 self.centroids_version, 
@@ -343,10 +334,12 @@ class TrainingDatasetBuilder:
                 y_rows.append(label)
                 tmdb_ids.append(tmdb_id)
                 
-                if label == 1:
+                if label >= POSITIVE_RATING_THRESHOLD:
                     self.stats["positive_samples"] += 1
-                else:
+                elif label <= NEGATIVE_RATING_THRESHOLD:
                     self.stats["negative_samples"] += 1
+                else:
+                    self.stats["ignored_samples"] += 1
             
             # Step 6: Convert to DataFrames
             centroid_feature_names = get_centroid_feature_names(self.n_clusters)
@@ -385,11 +378,12 @@ class TrainingDatasetBuilder:
             print("SUMMARY")
             print("=" * 70)
             print(f"Total interactions:        {self.stats['total_interactions']}")
-            print(f"✓ Positive samples (y=1):  {self.stats['positive_samples']}")
-            print(f"✓ Negative samples (y=0):  {self.stats['negative_samples']}")
-            print(f"⚠ Ignored (6-7 ratings):   {self.stats['ignored_samples']}")
+            print(f"✓ Samples with rating:     {len(y_rows)}")
+            print(f"  - High (>= {POSITIVE_RATING_THRESHOLD}): {self.stats['positive_samples']}")
+            print(f"  - Low (<= {NEGATIVE_RATING_THRESHOLD}):  {self.stats['negative_samples']}")
+            print(f"  - Mid (6-7):             {self.stats['ignored_samples']}")
             print(f"✗ Missing features:        {self.stats['missing_features']}")
-            print(f"\nClass balance: {self.stats['positive_samples'] / max(1, self.stats['positive_samples'] + self.stats['negative_samples']):.1%} positive")
+            print(f"\nAverage Rating: {np.mean(y_rows):.2f}")
             print("=" * 70)
             
         finally:

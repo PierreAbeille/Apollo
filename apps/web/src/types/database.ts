@@ -27,6 +27,7 @@ export interface TasteCandidate {
     id: number;
     tmdb_id: number;
     taste_score: number;
+    taste_score_formatted?: string;
     model_version: string;
     generated_at: string;
     // Joined fields

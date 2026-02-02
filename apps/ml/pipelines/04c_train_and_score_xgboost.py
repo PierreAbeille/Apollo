@@ -49,7 +49,7 @@ from features.centroid_features import (
 # XGBoost and sklearn imports
 import xgboost as xgb
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, average_precision_score, classification_report
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 
 # Paths
@@ -100,7 +100,7 @@ class XGBoostTrainerScorer:
         
         print(f"  X shape: {X_df.shape}")
         print(f"  y shape: {y_df.shape}")
-        print(f"  Class distribution: {y_df['label'].value_counts().to_dict()}")
+        print(f"  Average rating: {y_df['label'].mean():.2f}")
         
         return X_df, y_df
 
@@ -156,7 +156,7 @@ class XGBoostTrainerScorer:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         config_str = f"{XGBOOST_N_ESTIMATORS}_{XGBOOST_MAX_DEPTH}_{XGBOOST_LEARNING_RATE}"
         config_hash = hashlib.md5(config_str.encode()).hexdigest()[:6]
-        return f"xgb_taste_v{timestamp}_{config_hash}"
+        return f"xgb_reg_v{timestamp}_{config_hash}"
 
     def train(self) -> None:
         """Train XGBoost model."""
@@ -178,7 +178,6 @@ class XGBoostTrainerScorer:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, 
             test_size=XGBOOST_TEST_SIZE, 
-            stratify=y, 
             random_state=XGBOOST_SEED
         )
         
@@ -188,18 +187,17 @@ class XGBoostTrainerScorer:
         print(f"  Test: {len(X_test)} samples")
         
         # Train
-        print(f"\n🚀 Training XGBClassifier...")
+        print(f"\n🚀 Training XGBRegressor...")
         print(f"  n_estimators: {XGBOOST_N_ESTIMATORS}")
         print(f"  max_depth: {XGBOOST_MAX_DEPTH}")
         print(f"  learning_rate: {XGBOOST_LEARNING_RATE}")
         
-        self.model = xgb.XGBClassifier(
+        self.model = xgb.XGBRegressor(
             n_estimators=XGBOOST_N_ESTIMATORS,
             max_depth=XGBOOST_MAX_DEPTH,
             learning_rate=XGBOOST_LEARNING_RATE,
             random_state=XGBOOST_SEED,
-            use_label_encoder=False,
-            eval_metric="logloss",
+            eval_metric="rmse",
             verbosity=1,
         )
         
@@ -211,19 +209,19 @@ class XGBoostTrainerScorer:
         
         # Evaluate
         print("\n📈 Evaluating model...")
-        y_pred_proba = self.model.predict_proba(X_test)[:, 1]
         y_pred = self.model.predict(X_test)
         
-        auc_roc = roc_auc_score(y_test, y_pred_proba)
-        auc_pr = average_precision_score(y_test, y_pred_proba)
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        mae = mean_absolute_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
         
-        self.stats["auc_roc"] = auc_roc
-        self.stats["auc_pr"] = auc_pr
+        # Also log MAE for summary
+        self.stats["auc_roc"] = rmse # Temporary hack: reusing stats slot for regression
+        self.stats["auc_pr"] = mae
         
-        print(f"\n  🎯 AUC-ROC: {auc_roc:.4f}")
-        print(f"  🎯 AUC-PR:  {auc_pr:.4f}")
-        print("\nClassification Report:")
-        print(classification_report(y_test, y_pred, target_names=["Negative", "Positive"]))
+        print(f"\n  🎯 RMSE: {rmse:.4f} (Root Mean Squared Error)")
+        print(f"  🎯 MAE:  {mae:.4f} (Mean Absolute Error)")
+        print(f"  🎯 R2 Score: {r2:.4f}")
         
         # Feature importance (top 20)
         print("\n📊 Top 20 Feature Importances:")
@@ -340,7 +338,7 @@ class XGBoostTrainerScorer:
                     f"No model found in {MODELS_DIR}. Run training first."
                 )
             model_path = model_files[0]
-            self.model = xgb.XGBClassifier()
+            self.model = xgb.XGBRegressor()
             self.model.load_model(str(model_path))
             self.model_version = model_path.stem
             print(f"  Loaded: {model_path.name}")
@@ -357,9 +355,11 @@ class XGBoostTrainerScorer:
                 skipped += 1
                 continue
             
-            # Get probability of positive class
-            proba = self.model.predict_proba(features.reshape(1, -1))[0, 1]
-            scored_candidates.append((tmdb_id, float(proba)))
+            # Get predicted rating
+            score = self.model.predict(features.reshape(1, -1))[0]
+            # Clip score to 1-10 range if needed
+            score = max(1.0, min(10.0, float(score)))
+            scored_candidates.append((tmdb_id, score))
             
             if (i + 1) % 100 == 0:
                 print(f"  [{i+1}/{len(candidate_ids)}] Scored...")
@@ -411,8 +411,8 @@ class XGBoostTrainerScorer:
             if not score_only:
                 print(f"Training samples:     {self.stats['train_samples']}")
                 print(f"Test samples:         {self.stats['test_samples']}")
-                print(f"🎯 AUC-ROC:           {self.stats['auc_roc']:.4f}")
-                print(f"🎯 AUC-PR:            {self.stats['auc_pr']:.4f}")
+                print(f"🎯 RMSE:              {self.stats['auc_roc']:.4f}")
+                print(f"🎯 MAE:               {self.stats['auc_pr']:.4f}")
             if not train_only:
                 print(f"Candidates scored:    {self.stats['candidates_scored']}")
                 print(f"Candidates saved:     {self.stats['candidates_saved']}")

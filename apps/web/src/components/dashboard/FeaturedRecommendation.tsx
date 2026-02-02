@@ -77,7 +77,7 @@ export function FeaturedRecommendation({ initialCandidate }: { initialCandidate:
                             </div>
                             <div className="flex flex-col items-end">
                                 <div className="text-3xl font-black text-accent tracking-tighter">
-                                    {(candidate.taste_score * 100).toFixed(0)}%
+                                    {candidate.taste_score_formatted}
                                 </div>
                                 <div className="text-[10px] text-zinc-600 font-black uppercase tracking-tighter">
                                     Indice de Match

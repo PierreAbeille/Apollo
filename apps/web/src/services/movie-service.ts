@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 import { Movie, Interaction, TasteCandidate, MoodScore } from '@/types/database'
 import { getMovieDetails } from '@/lib/tmdb'
+import { formatTasteScore } from '@/utils/format'
 
 export async function getMovieService() {
     const cookieStore = await cookies()
@@ -88,7 +89,11 @@ export async function getMovieService() {
 
             if (error) throw error
 
-            return hydrateWithTMDb(data || []);
+            const hydrated = await hydrateWithTMDb(data || []);
+            return hydrated.map(item => ({
+                ...item,
+                taste_score_formatted: formatTasteScore(item.taste_score)
+            }));
         },
 
         async getRandomRecommendation(): Promise<TasteCandidate | null> {
@@ -110,7 +115,11 @@ export async function getMovieService() {
             if (error || !data) return null;
 
             const hydrated = await hydrateWithTMDb([data]);
-            return hydrated[0];
+            const candidate = hydrated[0];
+            return {
+                ...candidate,
+                taste_score_formatted: formatTasteScore(candidate.taste_score)
+            };
         },
 
         async getAIInsight(tmdbId: number): Promise<TasteCandidate | null> {
@@ -121,7 +130,10 @@ export async function getMovieService() {
                 .maybeSingle();
 
             if (error || !data) return null;
-            return data;
+            return {
+                ...data,
+                taste_score_formatted: formatTasteScore(data.taste_score)
+            };
         },
 
         async getInteraction(tmdbId: number): Promise<Interaction | null> {
@@ -165,6 +177,7 @@ export async function getMovieService() {
                     id: item.id,
                     tmdb_id: item.tmdb_id,
                     taste_score: item.taste_score,
+                    taste_score_formatted: formatTasteScore(item.taste_score),
                     model_version: item.model_version,
                     generated_at: item.generated_at,
                     title: item.title,
@@ -216,7 +229,8 @@ export async function getMovieService() {
                     poster_path: movies?.poster_path || item.poster_path,
                     release_year: movies?.release_year || item.release_year,
                     genres: features?.genres?.map((g: any) => g.name) || [],
-                    overview: features?.overview || item.overview
+                    overview: features?.overview || item.overview,
+                    taste_score_formatted: formatTasteScore(item.taste_score)
                 };
             });
 

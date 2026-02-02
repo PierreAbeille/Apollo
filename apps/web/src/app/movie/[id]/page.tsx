@@ -222,7 +222,7 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                                 <div className="pt-2 relative z-10">
                                     <div className="flex items-end gap-1">
                                         <span className={`text-5xl font-black ${accentColor} tracking-tighter leading-none`}>
-                                            {(aiInsight.taste_score * 100).toFixed(0)}%
+                                            {aiInsight.taste_score_formatted}
                                         </span>
                                         <span className="text-xs font-black text-zinc-500 uppercase tracking-tighter mb-1">Match</span>
                                     </div>
