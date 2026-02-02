@@ -51,11 +51,27 @@ class CandidatePoolBuilder:
         }
 
     def get_user_interactions(self) -> tuple:
-        """Get user interactions and extract rated/watched IDs."""
+        """
+        Get user interactions and extract seen vs watchlist IDs.
+        
+        Returns:
+            Tuple of (interactions, seen_ids, watchlist_ids)
+        """
         interactions = self.db.get_all_interactions()
-        rated_ids = {i["tmdb_id"] for i in interactions if i.get("rating") is not None}
-        all_interaction_ids = {i["tmdb_id"] for i in interactions}
-        return interactions, rated_ids, all_interaction_ids
+        
+        # Seen: rated OR is_done=True
+        seen_ids = {
+            i["tmdb_id"] for i in interactions 
+            if i.get("rating") is not None or i.get("is_done")
+        }
+        
+        # Watchlist: is_wishlisted=True AND NOT seen
+        watchlist_ids = {
+            i["tmdb_id"] for i in interactions 
+            if i.get("is_wishlisted") and i["tmdb_id"] not in seen_ids
+        }
+        
+        return interactions, seen_ids, watchlist_ids
 
     def expand_candidate_pool(self, highly_rated_ids: List[int]) -> Set[int]:
         """
@@ -209,8 +225,8 @@ class CandidatePoolBuilder:
         try:
             # Step 1: Get user interactions
             print("\n📖 Loading user interactions...")
-            interactions, rated_ids, all_ids = self.get_user_interactions()
-            print(f"  Found {len(rated_ids)} rated films, {len(all_ids)} total interactions")
+            interactions, seen_ids, watchlist_ids = self.get_user_interactions()
+            print(f"  Found {len(seen_ids)} seen films, {len(watchlist_ids)} in watchlist")
             
             # Step 2: Get highly rated films (seeds)
             highly_rated = get_highly_rated_movies(interactions, MIN_RATING_FOR_SIMILAR)
@@ -219,13 +235,17 @@ class CandidatePoolBuilder:
             
             # Step 3: Expand via TMDb Similar
             candidate_ids = self.expand_candidate_pool(highly_rated)
+            
+            # Step 4: Explicitly Add Watchlist!
+            print(f"  Adding {len(watchlist_ids)} movies from watchlist to candidate pool")
+            candidate_ids.update(watchlist_ids)
             self.stats["unique_candidates"] = len(candidate_ids)
             
-            # Step 4: Ensure features exist for all candidates
-            self.ensure_movie_features(candidate_ids, rated_ids)
+            # Step 5: Ensure features exist for all candidates (excluding seen)
+            self.ensure_movie_features(candidate_ids, seen_ids)
             
-            # Step 5: Save candidate pool
-            self.save_candidate_pool(candidate_ids, rated_ids)
+            # Step 6: Save candidate pool
+            self.save_candidate_pool(candidate_ids, seen_ids)
             
             # Summary
             print("\n" + "=" * 70)
