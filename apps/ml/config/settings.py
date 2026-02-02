@@ -34,6 +34,7 @@ NEW_CANDIDATE_BATCH_SIZE = 50  # Process new candidates in batches to manage mem
 
 # Letterboxd
 LETTERBOXD_CSV_PATH = os.path.join(RAW_DATA_DIR, "letterboxd", "letterboxd-data.csv")
+ML_DATASET_PATH = os.path.join(RAW_DATA_DIR, "letterboxd", "ml_dataset_full.csv")
 
 # Cache
 TMDB_CACHE_DB = os.path.join(CACHE_DIR, "tmdb_match.db")
@@ -41,3 +42,27 @@ TMDB_CACHE_DB = os.path.join(CACHE_DIR, "tmdb_match.db")
 # Logs
 UNMATCHED_LOG = os.path.join(LOGS_DIR, "unmatched.csv")
 AMBIGUOUS_LOG = os.path.join(LOGS_DIR, "ambiguous.csv")
+
+# Training data output
+TRAIN_DATA_DIR = os.path.join(DATA_DIR, "train")
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+
+# Ensure new directories exist
+os.makedirs(TRAIN_DATA_DIR, exist_ok=True)
+os.makedirs(MODELS_DIR, exist_ok=True)
+
+# XGBoost settings
+XGBOOST_SEED = 42
+XGBOOST_TEST_SIZE = 0.2
+XGBOOST_N_ESTIMATORS = 100
+XGBOOST_MAX_DEPTH = 6
+XGBOOST_LEARNING_RATE = 0.1
+
+# Feature engineering settings
+TOP_GENRES = 20
+TOP_KEYWORDS = 300
+TOP_LANGUAGES = 10
+
+# Labeling thresholds
+POSITIVE_RATING_THRESHOLD = 8  # rating >= 8 -> y=1
+NEGATIVE_RATING_THRESHOLD = 5  # rating <= 5 -> y=0

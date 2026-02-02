@@ -106,6 +106,7 @@ class DatabaseClient:
         self, 
         tmdb_id: int, 
         rating: Optional[float] = None,
+        is_done: bool = False,
         is_wishlisted: bool = False,
         is_recommended: bool = False,
         source: str = "letterboxd"
@@ -116,6 +117,7 @@ class DatabaseClient:
         Args:
             tmdb_id: TMDB movie ID
             rating: User rating (1-10)
+            is_done: Whether movie has been watched
             is_wishlisted: Whether movie is in wishlist
             is_recommended: Whether movie is recommended by user
             source: Source of interaction ('letterboxd' or 'app')
@@ -130,17 +132,17 @@ class DatabaseClient:
             # Update existing
             query = """
                 UPDATE interactions 
-                SET rating = %s, is_wishlisted = %s, is_recommended = %s, created_at = NOW()
+                SET rating = %s, is_done = %s, is_wishlisted = %s, is_recommended = %s, created_at = NOW()
                 WHERE id = %s
             """
-            self.execute(query, (rating, is_wishlisted, is_recommended, existing["id"]))
+            self.execute(query, (rating, is_done, is_wishlisted, is_recommended, existing["id"]))
         else:
             # Insert new
             query = """
-                INSERT INTO interactions (tmdb_id, rating, is_wishlisted, is_recommended, source, created_at)
-                VALUES (%s, %s, %s, %s, %s, NOW())
+                INSERT INTO interactions (tmdb_id, rating, is_done, is_wishlisted, is_recommended, source, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
-            self.execute(query, (tmdb_id, rating, is_wishlisted, is_recommended, source))
+            self.execute(query, (tmdb_id, rating, is_done, is_wishlisted, is_recommended, source))
 
     
     def get_movie_by_tmdb_id(self, tmdb_id: int) -> Optional[Dict[str, Any]]:

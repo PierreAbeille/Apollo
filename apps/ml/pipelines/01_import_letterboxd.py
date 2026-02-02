@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.settings import (
     LETTERBOXD_CSV_PATH,
+    ML_DATASET_PATH,
     TMDB_CACHE_DB,
     UNMATCHED_LOG,
     AMBIGUOUS_LOG,
@@ -30,17 +31,19 @@ from utils.cache import TMDBCache
 class LetterboxdImporter:
     """Handles Letterboxd CSV import and TMDB matching."""
     
-    def __init__(self, csv_path: str, cache_path: str):
+    def __init__(self, csv_path: str, cache_path: str, use_new_format: bool = False):
         """
         Initialize importer.
         
         Args:
             csv_path: Path to Letterboxd CSV
             cache_path: Path to SQLite cache database
+            use_new_format: If True, use new ml_dataset_full.csv format
         """
         self.csv_path = csv_path
         self.cache = TMDBCache(cache_path)
         self.db = DatabaseClient()
+        self.use_new_format = use_new_format
         
         # Statistics
         self.stats = {
@@ -165,15 +168,40 @@ class LetterboxdImporter:
         if not title:
             return False
         
-        # Parse year from release_date
-        release_date = row.get("release_date", "").strip()
-        year = int(release_date) if release_date.isdigit() else None
+        # Parse year - handle both old and new format
+        if self.use_new_format:
+            # New format: 'year' column directly
+            year_str = row.get("year", "").strip()
+            year = int(year_str) if year_str.isdigit() else None
+            
+            # Parse interaction type to derive is_done and is_wishlisted
+            interaction_type = row.get("interaction", "").strip().lower()
+            is_done = interaction_type == "watched"
+            is_wishlisted = interaction_type == "watchlist"
+            
+            # Rating in new format is 1-5 (Letterboxd scale), convert to 1-10
+            rating_str = row.get("rating", "").strip()
+            if rating_str:
+                try:
+                    letterboxd_rating = float(rating_str)
+                    rating = letterboxd_rating * 2  # Convert 1-5 to 2-10 scale
+                except ValueError:
+                    rating = None
+            else:
+                rating = None
+        else:
+            # Old format: 'release_date' column
+            release_date = row.get("release_date", "").strip()
+            year = int(release_date) if release_date.isdigit() else None
+            
+            # Old format flags
+            is_done = True  # Assumed watched in old format
+            is_wishlisted = row.get("is_wishlisted", "").lower() == "true"
+            
+            # Rating already in 1-10 scale
+            rating_str = row.get("rating", "").strip()
+            rating = float(rating_str) if rating_str else None
         
-        # Parse other fields
-        rating_str = row.get("rating", "").strip()
-        rating = float(rating_str) if rating_str else None
-        
-        is_wishlisted = row.get("is_wishlisted", "").lower() == "true"
         is_recommended = row.get("is_recommended", "").lower() == "true"
         
         # Match to TMDB
@@ -195,6 +223,7 @@ class LetterboxdImporter:
             self.db.upsert_interaction(
                 tmdb_id=tmdb_id,
                 rating=rating,
+                is_done=is_done,
                 is_wishlisted=is_wishlisted,
                 is_recommended=is_recommended,
                 source="letterboxd",
@@ -279,5 +308,25 @@ class LetterboxdImporter:
 
 
 if __name__ == "__main__":
-    importer = LetterboxdImporter(LETTERBOXD_CSV_PATH, TMDB_CACHE_DB)
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Import Letterboxd data")
+    parser.add_argument("--new-format", action="store_true", 
+                        help="Use new ml_dataset_full.csv format")
+    parser.add_argument("--csv", type=str, default=None,
+                        help="Path to CSV file (defaults based on format)")
+    args = parser.parse_args()
+    
+    # Determine CSV path
+    if args.csv:
+        csv_path = args.csv
+    elif args.new_format:
+        csv_path = ML_DATASET_PATH
+    else:
+        csv_path = LETTERBOXD_CSV_PATH
+    
+    print(f"Using CSV: {csv_path}")
+    print(f"Format: {'NEW (ml_dataset_full.csv)' if args.new_format else 'OLD (letterboxd-data.csv)'}")
+    
+    importer = LetterboxdImporter(csv_path, TMDB_CACHE_DB, use_new_format=args.new_format)
     importer.run()

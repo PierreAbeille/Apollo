@@ -42,7 +42,7 @@ flowchart TD
     DB1 --> P04
     Cache --> P04
     
-    subgraph P04["Pipeline 04: Build Candidates"]
+    subgraph P04["Pipeline 04: Scoring Cosinus (Original)"]
         D1[Profil Utilisateur: films 8+] --> D2[Calculer moyenne embeddings]
         D2 --> D3[Expansion TMDb Similar]
         D3 --> D4[Calculer similarité cosinus]
@@ -50,7 +50,17 @@ flowchart TD
         D5 --> D6[Insérer taste_candidates]
     end
     
+    DB1 --> P04XGB
+    Cache --> P04XGB
+    
+    subgraph P04XGB["Pipeline 04 XGBoost (Nouveau)"]
+        X1[04a: Build Candidate Pool] --> X2[04b: Build Training Dataset]
+        X2 --> X3[04c: Train & Score XGBoost]
+        X3 --> X4[Insérer taste_candidates]
+    end
+    
     P04 --> DB3[(PostgreSQL: taste_candidates)]
+    P04XGB --> DB3
     
     Cache --> P05
     
@@ -70,6 +80,7 @@ flowchart TD
     style P02 fill:#7c3aed,color:#fff
     style P03 fill:#db2777,color:#fff
     style P04 fill:#dc2626,color:#fff
+    style P04XGB fill:#f97316,color:#fff
     style P05 fill:#ea580c,color:#fff
     style WebApp fill:#059669,color:#fff
 ```
@@ -80,10 +91,13 @@ flowchart TD
 
 | Pipeline | Input Principal | Output Principal | Temps Estimé | API Calls |
 |----------|----------------|------------------|--------------|-----------|
-| **01** | `letterboxd-data.csv` | `movies`, `interactions` | 2-5 min | TMDb Search |
+| **01** | `letterboxd-data.csv` ou `ml_dataset_full.csv` | `movies`, `interactions` | 2-5 min | TMDb Search |
 | **02** | `movies` (tmdb_id) | `movie_features` | 5-15 min | TMDb Details |
 | **03** | `movie_features.text_for_embedding` | `embeddings.npy` | 1-3 min | Aucun |
-| **04** | `interactions` + embeddings | `taste_candidates` | 10-20 min | TMDb Similar |
+| **04** | `interactions` + embeddings | `taste_candidates` (cosinus) | 10-20 min | TMDb Similar |
+| **04a** | `interactions` (films 8+) | `candidate_pool.json` | 5-10 min | TMDb Similar |
+| **04b** | `interactions` + `movie_features` | `X_train.parquet`, `y_train.parquet` | < 1 min | Aucun |
+| **04c** | Training data + candidates | `taste_candidates` (XGBoost) | 1-5 min | Aucun |
 | **05** | `config/moods.py` + embeddings | `movie_mood_scores` | < 1 min | Aucun |
 
 **Temps total première exécution** : ~20-40 minutes (selon nombre de films et connexion)
@@ -98,31 +112,27 @@ flowchart TD
 python pipelines/01_import_letterboxd.py
 python pipelines/02_sync_tmdb_features.py
 python pipelines/03_build_embeddings.py
+
+# Option A: Cosinus (original)
 python pipelines/04_build_taste_candidates_full.py
+
+# Option B: XGBoost ML (nouveau)
+python pipelines/04a_build_candidate_pool.py
+python pipelines/04b_build_training_dataset.py
+python pipelines/04c_train_and_score_xgboost.py
 ```
 
 ### Après Ajout de Nouvelles Notes
 ```bash
 # Si tu as mis à jour tes notes Letterboxd
-python pipelines/01_import_letterboxd.py  # Importe nouveaux films
-python pipelines/04_build_taste_candidates_full.py  # Recalcule
+python pipelines/01_import_letterboxd.py --new-format  # Nouveau format CSV
 
-# Pas besoin de 02 et 03 (déjà en cache)
-```
-
-### Après Changement de Préférences
-```bash
-# Si tes goûts ont évolué (nouvelles notes 8+)
+# Option A: Cosinus
 python pipelines/04_build_taste_candidates_full.py
-# 04 est "smart" : il skip les films déjà en DB
-```
 
-### Maintenance Périodique
-```bash
-# Tous les 3-6 mois : Rafraîchir les métadonnées TMDb
-python pipelines/02_sync_tmdb_features.py
-python pipelines/03_build_embeddings.py
-python pipelines/04_build_taste_candidates_full.py
+# Option B: XGBoost
+python pipelines/04a_build_candidate_pool.py
+python pipelines/04c_train_and_score_xgboost.py --score-only
 ```
 
 ---

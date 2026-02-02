@@ -1,45 +1,104 @@
 # Apollo ML Pipeline 🎬🤖
 
-Ce module gère le moteur de recommandation personnalisé d'Apollo. Il transforme tes données Letterboxd en suggestions intelligentes basées sur des embeddings sémantiques.
+Ce module gère le moteur de recommandation personnalisé d'Apollo. Il transforme tes données Letterboxd en suggestions intelligentes basées sur des embeddings sémantiques et/ou un modèle XGBoost.
 
-## 🚀 Quick Start (Générer des recommandations)
+## 🚀 Quick Start
 
-Si tu as déjà ajouté de nouveaux films sur Letterboxd ou si tu veux juste rafraîchir tes suggestions :
+### Option A: Recommandations par Cosinus (classique)
 
-1. **Active l'environnement** : `source .venv/bin/activate` (depuis `apps/ml`)
-2. **Lance le pipeline complet** :
-   ```bash
-   python pipelines/04_build_taste_candidates_full.py
-   ```
-   *Ce script s'occupe de tout : trouver des candidats sur TMDB, les importer, les enrichir, générer les vecteurs et les scorer.*
+```bash
+source .venv/bin/activate
+python pipelines/04_build_taste_candidates_full.py
+```
+
+### Option B: Recommandations par XGBoost ML (nouveau)
+
+```bash
+source .venv/bin/activate
+
+# 1. Importer les données (avec nouveau format CSV)
+python pipelines/01_import_letterboxd.py --new-format
+
+# 2. Synchroniser les features TMDb (inchangé)
+python pipelines/02_sync_tmdb_features.py
+
+# 3. Générer les embeddings (inchangé)
+python pipelines/03_build_embeddings.py
+
+# 4a. Construire le pool de candidats
+python pipelines/04a_build_candidate_pool.py
+
+# 4b. Construire le dataset d'entraînement
+python pipelines/04b_build_training_dataset.py
+
+# 4c. Entraîner XGBoost et scorer les candidats
+python pipelines/04c_train_and_score_xgboost.py
+```
 
 ## 🏗️ Architecture des Pipelines
 
-Le système est découpé en 4 étapes logiques :
+### Pipelines de base (1-3)
 
-1.  **`01_import_letterboxd.py`** : Importe ton fichier `letterboxd-data.csv`. Il matche les titres avec TMDB et les stocke dans Supabase.
-2.  **`02_sync_tmdb_features.py`** : Récupère les métadonnées riches (synopsis, cast, genres, etc.) en anglais pour optimiser la qualité des vecteurs.
-3.  **`03_build_embeddings.py`** : Transforme les textes en vecteurs numériques (384 dimensions) via le modèle `paraphrase-multilingual-MiniLM-L12-v2`.
-4.  **`04_build_taste_candidates_full.py`** (Le "Cerveau") : 
-    *   Analyse tes goûts (films notés 8+).
-    *   Demande à TMDB des films similaires.
-    *   Score les candidats par similarité cosinus avec ton "Profil utilisateur".
-    *   Sauvegarde les meilleurs résultats dans la table `taste_candidates`.
+| Pipeline | Description |
+|----------|-------------|
+| `01_import_letterboxd.py` | Importe le CSV Letterboxd. Supporte `--new-format` pour `ml_dataset_full.csv` |
+| `02_sync_tmdb_features.py` | Récupère les métadonnées TMDb (synopsis, cast, genres, keywords) |
+| `03_build_embeddings.py` | Génère les embeddings avec `paraphrase-multilingual-MiniLM-L12-v2` |
+
+### Pipeline 04 - Recommandations
+
+**Version Cosinus (originale)** :
+- `04_build_taste_candidates_full.py` : Score par similarité cosinus au profil utilisateur
+
+**Version XGBoost ML (nouvelle)** :
+| Pipeline | Description |
+|----------|-------------|
+| `04a_build_candidate_pool.py` | Expansion via TMDb Similar, sauvegarde dans `candidate_pool.json` |
+| `04b_build_training_dataset.py` | Construit X/y pour XGBoost (features V1: cosine, year, lang, genres, keywords) |
+| `04c_train_and_score_xgboost.py` | Entraîne, évalue (AUC/PR-AUC), et score les candidats |
+
+### Pipeline optionnel
+
+| Pipeline | Description |
+|----------|-------------|
+| `05_build_mood_scores.py` | Calcule les scores mood↔film (18 moods) |
 
 ## ⚙️ Configuration (`config/settings.py`)
 
-- `MIN_RATING_FOR_SIMILAR` (défaut: 8) : Seuil de note pour qu'un film serve de base à l'expansion des candidats.
-- `TMDB_RATE_LIMIT_DELAY` (défaut: 1.5) : Délai de sécurité pour respecter les quotas de TMDB (50 req/min).
-- `MAX_TASTE_CANDIDATES` (défaut: 2000) : Nombre de recommandations à conserver en base.
+### Recommandations
+- `MIN_RATING_FOR_SIMILAR` (défaut: 8) : Seuil pour les films "seeds"
+- `MAX_TASTE_CANDIDATES` (défaut: 2000) : Nombre max de recommandations
+
+### XGBoost
+- `XGBOOST_N_ESTIMATORS` (défaut: 100) : Nombre d'arbres
+- `XGBOOST_MAX_DEPTH` (défaut: 6) : Profondeur max des arbres
+- `XGBOOST_LEARNING_RATE` (défaut: 0.1) : Taux d'apprentissage
+
+### Labels
+- `POSITIVE_RATING_THRESHOLD` (défaut: 8) : rating >= 8 → y=1
+- `NEGATIVE_RATING_THRESHOLD` (défaut: 5) : rating <= 5 → y=0
 
 ## 🗂️ Structure du projet
 
-- `clients/` : Wrappers pour Supabase (Postgres) et TMDB API.
-- `embeddings/` : Logique de vectorisation et de calcul de similarité.
-- `features/` : Construction du "Text for Embedding" et calcul du profil utilisateur.
-- `data/` : Cache local et embeddings sauvegardés (pour éviter de tout recalculer).
+```
+apps/ml/
+├── clients/         # DB (Supabase) et TMDb API
+├── config/          # settings.py
+├── embeddings/      # Encoder et similarité
+├── features/        # Text builder et profil utilisateur
+├── pipelines/       # Scripts d'exécution
+├── data/
+│   ├── cache/       # candidate_pool.json
+│   ├── embeddings/  # movie_embeddings.npy
+│   ├── train/       # X_train.parquet, y_train.parquet
+│   └── raw/         # CSV Letterboxd
+└── models/          # Modèles XGBoost sauvegardés
+```
 
 ## 💡 Notes Techniques
-- **Langue** : Les données TMDB sont récupérées en **anglais** pour l'IA (meilleure sémantique), mais l'application web peut afficher ce qu'elle veut.
-- **Résilience** : Le pipeline 04 est "resumable". Si tu l'arrêtes, il vérifiera ce qui est déjà en base au redémarrage pour ne pas gâcher de requêtes API.
-- **Base de données** : Toutes les écritures utilisent des `upsert` (ON CONFLICT) pour garantir qu'il n'y a jamais de doublons.
+
+- **Langue** : Données TMDb en anglais pour l'IA
+- **Résilience** : Tous les pipelines sont "resumables"
+- **Base de données** : Utilisation d'`upsert` (ON CONFLICT) pour éviter les doublons
+- **XGBoost** : Le modèle est sauvegardé en JSON pour reproductibilité
+
