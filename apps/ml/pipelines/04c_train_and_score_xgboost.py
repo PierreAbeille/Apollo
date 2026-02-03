@@ -186,42 +186,60 @@ class XGBoostTrainerScorer:
         print(f"  Train: {len(X_train)} samples")
         print(f"  Test: {len(X_test)} samples")
         
-        # Train
-        print(f"\n🚀 Training XGBRegressor...")
+        # Train - Ordinal Classification (Phase 13)
+        print(f"\n🚀 Training XGBClassifier (Ordinal Multi-class)...")
         print(f"  n_estimators: {XGBOOST_N_ESTIMATORS}")
         print(f"  max_depth: {XGBOOST_MAX_DEPTH}")
         print(f"  learning_rate: {XGBOOST_LEARNING_RATE}")
+        print(f"  n_classes: 10 (ratings 1-10)")
         
-        self.model = xgb.XGBRegressor(
+        # Convert ratings to contiguous classes (XGBoost requires 0-based labels)
+        from sklearn.preprocessing import LabelEncoder
+        self.label_encoder = LabelEncoder()
+        y_train_cls = self.label_encoder.fit_transform(y_train)
+        y_test_cls = self.label_encoder.transform(y_test)
+        n_classes = len(self.label_encoder.classes_)
+        
+        print(f"  n_classes: {n_classes} (ratings: {sorted(self.label_encoder.classes_)})")
+        
+        self.model = xgb.XGBClassifier(
             n_estimators=XGBOOST_N_ESTIMATORS,
             max_depth=XGBOOST_MAX_DEPTH,
             learning_rate=XGBOOST_LEARNING_RATE,
             random_state=XGBOOST_SEED,
-            eval_metric="rmse",
+            num_class=n_classes,
+            objective="multi:softmax",
+            eval_metric="mlogloss",
             verbosity=1,
         )
         
         self.model.fit(
-            X_train, y_train,
-            eval_set=[(X_test, y_test)],
+            X_train, y_train_cls,
+            eval_set=[(X_test, y_test_cls)],
             verbose=True,
         )
         
         # Evaluate
         print("\n📈 Evaluating model...")
-        y_pred = self.model.predict(X_test)
+        y_pred_cls = self.model.predict(X_test)
+        y_pred = self.label_encoder.inverse_transform(y_pred_cls)  # Convert back to original ratings
         
-        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        # Calculate metrics treating predictions as ordinal
+        from sklearn.metrics import accuracy_score, classification_report
+        accuracy = accuracy_score(y_test, y_pred)
+        
+        # Also compute "within 1" accuracy (ordinal tolerance)
+        within_1 = np.mean(np.abs(y_test - y_pred) <= 1)
+        within_2 = np.mean(np.abs(y_test - y_pred) <= 2)
         mae = mean_absolute_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
         
-        # Also log MAE for summary
-        self.stats["auc_roc"] = rmse # Temporary hack: reusing stats slot for regression
+        self.stats["auc_roc"] = accuracy
         self.stats["auc_pr"] = mae
         
-        print(f"\n  🎯 RMSE: {rmse:.4f} (Root Mean Squared Error)")
-        print(f"  🎯 MAE:  {mae:.4f} (Mean Absolute Error)")
-        print(f"  🎯 R2 Score: {r2:.4f}")
+        print(f"\n  🎯 Exact Accuracy: {accuracy:.2%}")
+        print(f"  🎯 Within ±1: {within_1:.2%}")
+        print(f"  🎯 Within ±2: {within_2:.2%}")
+        print(f"  🎯 MAE: {mae:.2f}")
         
         # Feature importance (top 20)
         print("\n📊 Top 20 Feature Importances:")
@@ -302,22 +320,8 @@ class XGBoostTrainerScorer:
         keyword_vocab = self.feature_schema["keyword_vocab"]
         for k in keyword_vocab:
             features.append(1.0 if k in keyword_names else 0.0)
-            
-        # 7. Production Countries multi-hot (New in Phase 12)
-        # Note: Must handle None or empty string gracefully
-        raw_countries = movie_feats.get("production_countries") or []
-        if isinstance(raw_countries, str):
-            raw_countries = json.loads(raw_countries)
         
-        # Build set for faster lookup
-        country_vocab = self.feature_schema["country_vocab"]
-        # Countries are simple strings in the list
-        country_set = set(raw_countries)
-        
-        for c in country_vocab:
-            features.append(1.0 if c in country_set else 0.0)
-        
-        # 8. Decade one-hot (New in Phase 12)
+        # Decade one-hot
         decade_vocab = self.feature_schema["decade_vocab"]
         
         if release_year:
@@ -357,13 +361,13 @@ class XGBoostTrainerScorer:
         # Load model if not already loaded
         if self.model is None:
             print("\n🔄 Loading latest model...")
-            model_files = sorted(Path(MODELS_DIR).glob("xgb_taste_*.json"), reverse=True)
+            model_files = sorted(Path(MODELS_DIR).glob("xgb_*.json"), reverse=True)
             if not model_files:
                 raise FileNotFoundError(
                     f"No model found in {MODELS_DIR}. Run training first."
                 )
             model_path = model_files[0]
-            self.model = xgb.XGBRegressor()
+            self.model = xgb.XGBClassifier()
             self.model.load_model(str(model_path))
             self.model_version = model_path.stem
             print(f"  Loaded: {model_path.name}")
@@ -380,11 +384,20 @@ class XGBoostTrainerScorer:
                 skipped += 1
                 continue
             
-            # Get predicted rating
-            score = self.model.predict(features.reshape(1, -1))[0]
-            # Clip score to 1-10 range if needed
-            score = max(1.0, min(10.0, float(score)))
-            scored_candidates.append((tmdb_id, score))
+            # Compute expected rating using class probabilities (Option 1)
+            # E[rating] = Σ (probability_class × rating_value)
+            probas = self.model.predict_proba(features.reshape(1, -1))[0]
+            
+            # Get the actual rating values for each class
+            if hasattr(self, 'label_encoder') and self.label_encoder is not None:
+                class_values = self.label_encoder.classes_
+            else:
+                # Fallback: assume classes 0-8 map to ratings 2-10
+                class_values = np.arange(2, 11)
+            
+            # Calculate expected rating as weighted sum
+            expected_rating = float(np.sum(probas * class_values))
+            scored_candidates.append((tmdb_id, expected_rating))
             
             if (i + 1) % 100 == 0:
                 print(f"  [{i+1}/{len(candidate_ids)}] Scored...")

@@ -46,7 +46,6 @@ from config.settings import (
     TOP_GENRES,
     TOP_KEYWORDS,
     TOP_LANGUAGES,
-    TOP_COUNTRIES,
     XGBOOST_SEED,
 )
 from clients.db import DatabaseClient
@@ -80,7 +79,6 @@ class TrainingDatasetBuilder:
         self.genre_vocab = []
         self.keyword_vocab = []
         self.lang_vocab = []
-        self.country_vocab = []
         self.decade_vocab = []
         
         # Statistics
@@ -146,33 +144,13 @@ class TrainingDatasetBuilder:
             
             if feat.get("lang"):
                 lang_counter[feat["lang"]] += 1
-                
-            if feat.get("production_countries"):
-                countries = feat["production_countries"] if isinstance(feat["production_countries"], list) else json.loads(feat["production_countries"])
-                for c in countries:
-                    if c:
-                        lang_counter[c] += 1 # Using lang_counter temporarily to collect all then separate? No.
-                        # Wait, I should use a separate counter.
         
-        # Fixing local scope counter issue in previous thought.
-        country_counter = Counter()
+        # Build decade vocab (Countries removed in Phase 13)
         decade_counter = Counter()
         
-        for feat in movie_features:
-            if feat.get("production_countries"):
-                countries = feat["production_countries"] if isinstance(feat["production_countries"], list) else json.loads(feat["production_countries"])
-                for c in countries:
-                    if c:
-                        country_counter[c] += 1
-            
-            # Extract decade from release_year (need to join with movies or get from feat if added)
-            # Actually, movie_features usually doesn't have release_year, but we can get it from movies.
-            # Let's assume we get tmdb_id from feat and look up in movies or we can pass joined data.
-            # For vocab builder, we might need a join.
-            
         # Re-fetching features with release_year for decade vocab
         query = """
-            SELECT mf.tmdb_id, m.release_year, mf.production_countries
+            SELECT mf.tmdb_id, m.release_year
             FROM movie_features mf
             JOIN movies m ON mf.tmdb_id = m.tmdb_id
         """
@@ -182,25 +160,17 @@ class TrainingDatasetBuilder:
             if year:
                 decade = (year // 10) * 10
                 decade_counter[decade] += 1
-            
-            p_countries = row.get("production_countries")
-            if p_countries:
-                countries = p_countries if isinstance(p_countries, list) else json.loads(p_countries)
-                for c in countries:
-                    if c:
-                        country_counter[c] += 1
+
 
         # Take top N
         self.genre_vocab = [g for g, _ in genre_counter.most_common(TOP_GENRES)]
         self.keyword_vocab = [k for k, _ in keyword_counter.most_common(TOP_KEYWORDS)]
         self.lang_vocab = [l for l, _ in lang_counter.most_common(TOP_LANGUAGES)]
-        self.country_vocab = [c for c, _ in country_counter.most_common(TOP_COUNTRIES)]
-        self.decade_vocab = sorted([d for d, count in decade_counter.items() if count >= 5]) # Keep decades with at least 5 movies
+        self.decade_vocab = sorted([d for d, count in decade_counter.items() if count >= 5])
         
         print(f"  Genres: {len(self.genre_vocab)}")
         print(f"  Keywords: {len(self.keyword_vocab)}")
         print(f"  Languages: {len(self.lang_vocab)}")
-        print(f"  Countries: {len(self.country_vocab)}")
         print(f"  Decades: {len(self.decade_vocab)} ({self.decade_vocab})")
 
     def _encode_multi_hot(self, values: List[str], vocab: List[str]) -> np.ndarray:
@@ -271,14 +241,9 @@ class TrainingDatasetBuilder:
         keywords_encoded = self._encode_multi_hot(keyword_names, self.keyword_vocab)
         features.extend(keywords_encoded)
         
-        # 6. Production Countries multi-hot (New in Phase 12)
-        raw_countries = movie_features.get("production_countries") or []
-        if isinstance(raw_countries, str):
-            raw_countries = json.loads(raw_countries)
-        countries_encoded = self._encode_multi_hot(raw_countries, self.country_vocab)
-        features.extend(countries_encoded)
+        # 6. Decade one-hot (Phase 12 - Countries removed in Phase 13)
         
-        # 7. Decade one-hot (New in Phase 12)
+        # Decade one-hot
         if release_year:
             decade = (release_year // 10) * 10
             decade_encoded = self._encode_one_hot(decade, self.decade_vocab)
@@ -299,13 +264,11 @@ class TrainingDatasetBuilder:
                 + [f"lang_{l}" for l in self.lang_vocab] 
                 + [f"genre_{g}" for g in self.genre_vocab]
                 + [f"kw_{k}" for k in self.keyword_vocab]
-                + [f"country_{c}" for c in self.country_vocab]
                 + [f"decade_{d}" for d in self.decade_vocab]
             ),
             "genre_vocab": self.genre_vocab,
             "keyword_vocab": self.keyword_vocab,
             "lang_vocab": self.lang_vocab,
-            "country_vocab": self.country_vocab,
             "decade_vocab": self.decade_vocab,
             "n_clusters": self.n_clusters,
             "centroids_version": self.centroids_version,
@@ -418,7 +381,6 @@ class TrainingDatasetBuilder:
                 + [f"lang_{l}" for l in self.lang_vocab]
                 + [f"genre_{g}" for g in self.genre_vocab]
                 + [f"kw_{k}" for k in self.keyword_vocab]
-                + [f"country_{c}" for c in self.country_vocab]
                 + [f"decade_{d}" for d in self.decade_vocab]
             )
             
