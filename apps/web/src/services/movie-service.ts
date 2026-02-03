@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 import { Movie, Interaction, TasteCandidate, MoodScore } from '@/types/database'
-import { getMovieDetails } from '@/lib/tmdb'
+import { getMovieDetails, searchMovies } from '@/lib/tmdb'
 import { formatTasteScore } from '@/utils/format'
 
 export async function getMovieService() {
@@ -273,6 +273,63 @@ export async function getMovieService() {
 
             if (error) throw error;
             return data || [];
+        },
+
+        async searchMoviesInLibrary(query: string): Promise<Movie[]> {
+            // 1. Search by ID (if query is a number)
+            let idMatch: Movie | null = null;
+            if (!isNaN(Number(query))) {
+                const { data } = await supabase
+                    .from('movies')
+                    .select('*')
+                    .eq('tmdb_id', query)
+                    .maybeSingle();
+                if (data) idMatch = data;
+            }
+
+            // 2. Search by Title in DB (Split terms for better flexibility)
+            // Example: "Harry Pot" -> matches title containing "Harry" AND "Pot"
+            const terms = query.trim().split(/\s+/).filter(t => t.length > 0);
+
+            let titleQuery = supabase.from('movies').select('*');
+
+            // Apply ILIKE for each term (AND logic)
+            // This allows "Potter Harry" to find "Harry Potter"
+            terms.forEach(term => {
+                titleQuery = titleQuery.ilike('title', `%${term}%`);
+            });
+
+            const { data: titleMatches } = await titleQuery.limit(20);
+
+            // 3. Search in TMDb to cover VO titles, then check if they exist in DB
+            let tmdbMatchesInDb: Movie[] = [];
+            try {
+                // For TMDb, we use the original full query as it handles natural language well
+                const tmdbResults = await searchMovies(query);
+                if (tmdbResults.results.length > 0) {
+                    const tmdbIds = tmdbResults.results.map(m => m.id);
+                    const { data } = await supabase
+                        .from('movies')
+                        .select('*')
+                        .in('tmdb_id', tmdbIds);
+                    if (data) tmdbMatchesInDb = data;
+                }
+            } catch (error) {
+                console.error('TMDb search failed:', error);
+            }
+
+            // Combine and Deduplicate
+            const allMatches = [
+                ...(idMatch ? [idMatch] : []),
+                ...(titleMatches || []),
+                ...tmdbMatchesInDb
+            ];
+
+            const uniqueMatches = Array.from(
+                new Map(allMatches.map(item => [item.tmdb_id, item])).values()
+            );
+
+            return hydrateWithTMDb(uniqueMatches);
         }
     }
 }

@@ -4,6 +4,7 @@ import { RecentMovies } from '@/components/dashboard/RecentMovies';
 import { RecentInteractions } from '@/components/dashboard/RecentInteractions';
 import { TopCandidates } from '@/components/dashboard/TopCandidates';
 import { FeaturedRecommendation } from '@/components/dashboard/FeaturedRecommendation';
+import { SearchBar } from '@/components/dashboard/SearchBar';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,11 @@ export default async function Page() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-3 bg-base-200 px-4 py-2 rounded-xl border border-base-300 shadow-sm">
+          <div className="flex flex-1 justify-center max-w-xl mx-4">
+            <SearchBar />
+          </div>
+
+          <div className="flex items-center gap-3 bg-base-200 px-4 py-2 rounded-xl border border-base-300 shadow-sm self-start md:self-auto">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
