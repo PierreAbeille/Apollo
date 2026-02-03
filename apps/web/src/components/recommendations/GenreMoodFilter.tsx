@@ -5,24 +5,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 // Moods mapped to their IDs (matching config/moods.py)
 const MOODS = [
     { id: '', name: 'Toutes les envies' },
-    { id: 'adrenaline', name: "Besoin d'adrénaline" },
-    { id: 'adventure', name: 'Évasion & Aventure' },
-    { id: 'animation', name: 'Un peu de magie' },
-    { id: 'comedy', name: 'Besoin de rire' },
-    { id: 'crime', name: 'Thriller & Polar' },
-    { id: 'documentary', name: 'Apprendre quelque chose' },
-    { id: 'drama', name: 'Émotion & Drame' },
-    { id: 'family', name: 'En famille' },
-    { id: 'fantasy', name: 'Mondes imaginaires' },
-    { id: 'history', name: 'Histoire & Passé' },
-    { id: 'horror', name: 'Frisson & Horreur' },
-    { id: 'music', name: 'Musique & Rythme' },
-    { id: 'mystery', name: 'Mystère & Enquête' },
-    { id: 'romance', name: 'Amour & Romance' },
-    { id: 'scifi', name: 'Futur & SF' },
-    { id: 'thriller', name: 'Suspense total' },
-    { id: 'war', name: 'Guerre & Conflit' },
-    { id: 'western', name: 'Cowboys & Western' },
+    { id: 'mind_bending', name: 'Retourne le cerveau' },
+    { id: 'feel_good', name: 'Ça fait du bien' },
+    { id: 'dark_gritty', name: 'Sombre & Réaliste' },
+    { id: 'tension', name: 'Tension pure' },
+    { id: 'surreal', name: 'Onirique & Étrange' },
+    { id: 'epic', name: 'Grand Spectacle' },
+    { id: 'intimate', name: 'Intimiste & Calme' },
+    { id: 'nostalgia', name: 'Nostalgie' },
+    { id: 'disturbing', name: 'Dérangeant & Viscéral' },
 ];
 
 export function GenreMoodFilter() {

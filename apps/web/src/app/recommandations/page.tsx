@@ -2,6 +2,7 @@ import { getMovieService } from '@/services/movie-service';
 import Link from 'next/link';
 import { getImageUrl } from '@/lib/tmdb';
 import { GenreMoodFilter } from '@/components/recommendations/GenreMoodFilter';
+import { formatMoodScore } from '@/utils/mood-format';
 import { Suspense } from 'react';
 
 export default async function RecommandationsPage({
@@ -61,7 +62,7 @@ export default async function RecommandationsPage({
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Film</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Année</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Statut</th>
-                                    <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Score match</th>
+                                    <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">{moodId ? 'Mood Match' : 'Score Global'}</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right pr-8">Détails</th>
                                 </tr>
                             </thead>
@@ -109,12 +110,28 @@ export default async function RecommandationsPage({
                                                 </td>
                                                 <td className="p-4 text-right">
                                                     <div className="inline-flex flex-col items-end">
-                                                        <span className={`text-xl font-black ${accentColor} tracking-tighter leading-none`}>
-                                                            {movie.taste_score_formatted}
-                                                        </span>
-                                                        <div className="w-full h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
-                                                            <div className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`} style={{ width: `${movie.taste_score * 10}%` }} />
-                                                        </div>
+                                                        {moodId ? (
+                                                            <>
+                                                                <span className={`text-xl font-black ${accentColor} tracking-tighter leading-none`}>
+                                                                    {formatMoodScore(movie.mood_scores?.[0]?.similarity_score || 0)}
+                                                                </span>
+                                                                <div className="w-full h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`}
+                                                                        style={{ width: `${Math.min(100, ((movie.mood_scores?.[0]?.similarity_score || 0) / 0.5) * 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <span className={`text-xl font-black ${accentColor} tracking-tighter leading-none`}>
+                                                                    {movie.taste_score_formatted}
+                                                                </span>
+                                                                <div className="w-full h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
+                                                                    <div className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`} style={{ width: `${movie.taste_score * 10}%` }} />
+                                                                </div>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="p-4 text-right pr-8">

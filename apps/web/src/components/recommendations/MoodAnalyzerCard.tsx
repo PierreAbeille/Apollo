@@ -1,6 +1,7 @@
 'use client';
 
 import { MoodScore } from '@/types/database';
+import { formatMoodScore } from '@/utils/mood-format';
 
 interface MoodAnalyzerCardProps {
     moodScores: MoodScore[];
@@ -9,24 +10,15 @@ interface MoodAnalyzerCardProps {
 
 // Color palette for mood tags
 const MOOD_COLORS: Record<string, { bg: string; text: string; glow: string }> = {
-    adrenaline: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', glow: 'rgba(239, 68, 68, 0.3)' },
-    adventure: { bg: 'rgba(249, 115, 22, 0.15)', text: '#f97316', glow: 'rgba(249, 115, 22, 0.3)' },
-    animation: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7', glow: 'rgba(168, 85, 247, 0.3)' },
-    comedy: { bg: 'rgba(250, 204, 21, 0.15)', text: '#facc15', glow: 'rgba(250, 204, 21, 0.3)' },
-    crime: { bg: 'rgba(100, 116, 139, 0.15)', text: '#94a3b8', glow: 'rgba(100, 116, 139, 0.3)' },
-    documentary: { bg: 'rgba(34, 197, 94, 0.15)', text: '#22c55e', glow: 'rgba(34, 197, 94, 0.3)' },
-    drama: { bg: 'rgba(59, 130, 246, 0.15)', text: '#3b82f6', glow: 'rgba(59, 130, 246, 0.3)' },
-    family: { bg: 'rgba(244, 114, 182, 0.15)', text: '#f472b6', glow: 'rgba(244, 114, 182, 0.3)' },
-    fantasy: { bg: 'rgba(139, 92, 246, 0.15)', text: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.3)' },
-    history: { bg: 'rgba(146, 64, 14, 0.15)', text: '#d97706', glow: 'rgba(146, 64, 14, 0.3)' },
-    horror: { bg: 'rgba(31, 41, 55, 0.4)', text: '#9ca3af', glow: 'rgba(31, 41, 55, 0.5)' },
-    music: { bg: 'rgba(236, 72, 153, 0.15)', text: '#ec4899', glow: 'rgba(236, 72, 153, 0.3)' },
-    mystery: { bg: 'rgba(99, 102, 241, 0.15)', text: '#6366f1', glow: 'rgba(99, 102, 241, 0.3)' },
-    romance: { bg: 'rgba(244, 63, 94, 0.15)', text: '#f43f5e', glow: 'rgba(244, 63, 94, 0.3)' },
-    scifi: { bg: 'rgba(6, 182, 212, 0.15)', text: '#06b6d4', glow: 'rgba(6, 182, 212, 0.3)' },
-    thriller: { bg: 'rgba(220, 38, 38, 0.15)', text: '#dc2626', glow: 'rgba(220, 38, 38, 0.3)' },
-    war: { bg: 'rgba(120, 113, 108, 0.15)', text: '#a8a29e', glow: 'rgba(120, 113, 108, 0.3)' },
-    western: { bg: 'rgba(217, 119, 6, 0.15)', text: '#d97706', glow: 'rgba(217, 119, 6, 0.3)' },
+    mind_bending: { bg: 'rgba(168, 85, 247, 0.15)', text: '#a855f7', glow: 'rgba(168, 85, 247, 0.3)' }, // Purple
+    feel_good: { bg: 'rgba(250, 204, 21, 0.15)', text: '#facc15', glow: 'rgba(250, 204, 21, 0.3)' },   // Yellow
+    dark_gritty: { bg: 'rgba(71, 85, 105, 0.3)', text: '#94a3b8', glow: 'rgba(71, 85, 105, 0.4)' },     // Slate
+    tension: { bg: 'rgba(239, 68, 68, 0.15)', text: '#ef4444', glow: 'rgba(239, 68, 68, 0.3)' },       // Red
+    surreal: { bg: 'rgba(236, 72, 153, 0.15)', text: '#ec4899', glow: 'rgba(236, 72, 153, 0.3)' },     // Pink
+    epic: { bg: 'rgba(249, 115, 22, 0.15)', text: '#f97316', glow: 'rgba(249, 115, 22, 0.3)' },        // Orange
+    intimate: { bg: 'rgba(6, 182, 212, 0.15)', text: '#06b6d4', glow: 'rgba(6, 182, 212, 0.3)' },      // Cyan
+    nostalgia: { bg: 'rgba(244, 63, 94, 0.15)', text: '#f43f5e', glow: 'rgba(244, 63, 94, 0.3)' },     // Rose
+    disturbing: { bg: 'rgba(153, 27, 27, 0.2)', text: '#f87171', glow: 'rgba(153, 27, 27, 0.4)' },     // Dark Red
 };
 
 export function MoodAnalyzerCard({ moodScores, isNiche = false }: MoodAnalyzerCardProps) {
@@ -42,7 +34,7 @@ export function MoodAnalyzerCard({ moodScores, isNiche = false }: MoodAnalyzerCa
     const secondaryMoods = moodScores.slice(1, 4);
 
     const primaryColors = MOOD_COLORS[primaryMood.mood_id] || { bg: 'rgba(156, 163, 175, 0.15)', text: '#9ca3af', glow: 'rgba(156, 163, 175, 0.3)' };
-    const primaryPercentage = Math.round(primaryMood.similarity_score * 100);
+    const matchScore = formatMoodScore(primaryMood.similarity_score);
 
     const accentColor = isNiche ? 'text-success' : 'text-accent';
     const accentBorder = isNiche ? 'border-success/30' : 'border-accent/30';
@@ -74,7 +66,7 @@ export function MoodAnalyzerCard({ moodScores, isNiche = false }: MoodAnalyzerCa
                         className="text-3xl font-black tracking-tighter leading-none"
                         style={{ color: primaryColors.text }}
                     >
-                        {primaryPercentage}%
+                        {matchScore}
                     </span>
                     <div className="flex flex-col">
                         <span
@@ -108,10 +100,10 @@ export function MoodAnalyzerCard({ moodScores, isNiche = false }: MoodAnalyzerCa
                                 }}
                                 title={`${mood.mood_name}: ${percentage}%`}
                             >
-                                <span className="truncate max-w-[60px]">
-                                    {mood.mood_name.split(' ')[0]}
+                                <span className="opacity-100">
+                                    {mood.mood_name}
                                 </span>
-                                <span className="opacity-70">{percentage}%</span>
+                                <span className="opacity-70">{formatMoodScore(mood.similarity_score)}</span>
                             </div>
                         );
                     })}

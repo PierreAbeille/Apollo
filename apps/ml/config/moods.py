@@ -5,95 +5,50 @@ Each mood has a rich description to generate quality embeddings.
 
 MOODS = [
     {
-        "id": "adrenaline",
-        "name": "Besoin d'adrénaline",
-        "description": "Action explosive, courses-poursuites intenses, combats spectaculaires, cascades impressionnantes, tension extrême, adrénaline pure, rythme effréné"
+        "id": "mind_bending",
+        "name": "Retourne le cerveau",
+        "description": "Mind-bending, philosophie, paradoxe temporel, narration complexe, thriller psychologique, puzzle mental, réalité simulée, twist final choquant, intellectuellement stimulant. Films comme Inception, Matrix, Shutter Island, Tenet."
     },
     {
-        "id": "adventure",
-        "name": "Évasion & Aventure",
-        "description": "Voyages épiques, exploration de nouveaux mondes, découverte, quêtes héroïques, périples extraordinaires, horizons lointains, aventures palpitantes"
+        "id": "feel_good",
+        "name": "Ça fait du bien",
+        "description": "Feel-good, optimiste, réconfortant, inspirant, wholesome, humaniste, joie de vivre, espoir, chaleur humaine, personnages attachants. Films comme Intouchables, Amélie Poulain, Green Book, Paddington."
     },
     {
-        "id": "animation",
-        "name": "Un peu de magie",
-        "description": "Animation féerique, mondes enchantés, imaginaire enfantin, dessins animés, magie visuelle, émerveillement, poésie animée"
+        "id": "dark_gritty",
+        "name": "Sombre & Réaliste",
+        "description": "Dark, gritty, noirceur, violence réaliste, corruption, moralement ambigu, atmosphère pesante, thriller urbain, sans concession, désespéré. Films comme Joker, Se7en, Taxi Driver, Prisoners."
     },
     {
-        "id": "comedy",
-        "name": "Besoin de rire",
-        "description": "Comédie hilarante, humour absurde, situations comiques, gags, rire aux éclats, légèreté, bonne humeur contagieuse"
+        "id": "tension",
+        "name": "Tension pure",
+        "description": "Edge of your seat, suspense insoutenable, stress, survie, course contre la montre, angoisse, cloué au siège, adrénaline de survie. Films comme Mad Max: Fury Road, Whiplash, A Quiet Place, Gravity."
     },
     {
-        "id": "crime",
-        "name": "Thriller & Polar",
-        "description": "Enquête policière, crime organisé, détective, suspense criminel, polar noir, investigation, mystères sombres, gangsters"
+        "id": "surreal",
+        "name": "Onirique & Étrange",
+        "description": "Surréalisme, rêve, poésie visuelle, atmosphère étrange, abstrait, artistique, mélancolie douce, voyage spirituel, hallucinatoire. Films comme Spirited Away, Mulholland Drive, Eternal Sunshine of the Spotless Mind, The Grand Budapest Hotel."
     },
     {
-        "id": "documentary",
-        "name": "Apprendre quelque chose",
-        "description": "Documentaire instructif, exploration du réel, découverte, culture, histoire vraie, savoir, connaissance, reportage captivant"
+        "id": "epic",
+        "name": "Grand Spectacle",
+        "description": "Épique, grandiose, enjeux colossaux, batailles massives, mythes, légendes, orchestral, visuellement époustouflant, scale immense. Films comme Dune, Lord of the Rings, Gladiator, Avatar."
     },
     {
-        "id": "drama",
-        "name": "Émotion & Drame",
-        "description": "Drame profond, émotion intense, histoires humaines touchantes, larmes, sensibilité, parcours de vie, tragédie, mélancolie"
+        "id": "intimate",
+        "name": "Intimiste & Calme",
+        "description": "Intimiste, étude de caractère, lent, contemplatif, dialogue, relations humaines subtiles, réalisme émotionnel, calme, slice of life. Films comme Lost in Translation, Her, Past Lives, Moonlight."
     },
     {
-        "id": "family",
-        "name": "En famille",
-        "description": "Film familial, tous âges, valeurs familiales, moments partagés, douceur, bienveillance, aventures pour enfants et parents"
+        "id": "nostalgia",
+        "name": "Nostalgie",
+        "description": "Nostalgie, rétro, années 80, enfance, coming of age, souvenirs, mélancolie du passé, esthétique vintage, innocence perdue. Films comme Stranger Things, La La Land, Super 8, Stand by Me."
     },
     {
-        "id": "fantasy",
-        "name": "Mondes imaginaires",
-        "description": "Fantasy épique, créatures magiques, royaumes enchantés, elfes et dragons, quêtes mythiques, univers fantastiques, magie et sortilèges"
-    },
-    {
-        "id": "history",
-        "name": "Histoire & Passé",
-        "description": "Film historique, reconstitution d'époque, passé glorieux, grandes batailles, personnages historiques, fresque temporelle, mémoire collective"
-    },
-    {
-        "id": "horror",
-        "name": "Frisson & Horreur",
-        "description": "Horreur terrifiante, frissons glacés, peur viscérale, créatures monstrueuses, atmosphère angoissante, épouvante, cauchemar éveillé"
-    },
-    {
-        "id": "music",
-        "name": "Musique & Rythme",
-        "description": "Film musical, chansons entraînantes, danse, rythme, mélodies, concerts, ambiance festive, comédie musicale"
-    },
-    {
-        "id": "mystery",
-        "name": "Mystère & Enquête",
-        "description": "Mystère intrigant, énigmes à résoudre, secrets cachés, révélations surprenantes, suspense psychologique, puzzle narratif"
-    },
-    {
-        "id": "romance",
-        "name": "Amour & Romance",
-        "description": "Romance passionnée, histoire d'amour, sentiments profonds, passion amoureuse, coup de foudre, tendresse, relations intimes"
-    },
-    {
-        "id": "scifi",
-        "name": "Futur & SF",
-        "description": "Science-fiction futuriste, technologie avancée, voyages spatiaux, intelligence artificielle, dystopie, exploration spatiale, univers high-tech"
-    },
-    {
-        "id": "thriller",
-        "name": "Suspense total",
-        "description": "Thriller haletant, tension permanente, suspense insoutenable, retournements de situation, danger imminent, course contre la montre"
-    },
-    {
-        "id": "war",
-        "name": "Guerre & Conflit",
-        "description": "Film de guerre, batailles épiques, soldats héroïques, conflits armés, sacrifice, fraternité militaire, horreurs de la guerre"
-    },
-    {
-        "id": "western",
-        "name": "Cowboys & Western",
-        "description": "Western classique, cowboys, duels au soleil, Far West, chevaux et désert, hors-la-loi, shérif, frontière américaine"
-    },
+        "id": "disturbing",
+        "name": "Dérangeant & Viscéral",
+        "description": "Dérangeant, choc, horreur psychologique, malaise, violence graphique, traumatisme, peur viscérale, cauchemar, provocalteur. Films comme Midsommar, Requiem for a Dream, Parasite."
+    }
 ]
 
 
