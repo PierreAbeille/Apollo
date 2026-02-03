@@ -179,6 +179,10 @@ class CandidatePoolBuilder:
                     genres=data.get("genres", []),
                     cast=data.get("credits", {}).get("cast", [])[:10],
                     crew=metadata["crew"],
+                    production_countries=metadata["production_countries"],
+                    popularity=metadata["popularity"],
+                    vote_average=metadata["vote_average"],
+                    vote_count=metadata["vote_count"],
                     text_for_embedding=text
                 )
                 

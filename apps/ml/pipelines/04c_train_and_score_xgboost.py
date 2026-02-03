@@ -238,7 +238,6 @@ class XGBoostTrainerScorer:
         self.model_version = self._generate_model_version()
         model_path = Path(MODELS_DIR) / f"{self.model_version}.json"
         self.model.save_model(str(model_path))
-        print(f"\n💾 Saved model to {model_path}")
 
     def _build_candidate_features(self, tmdb_id: int) -> Optional[np.ndarray]:
         """Build feature vector for a candidate movie using the schema."""
@@ -262,7 +261,7 @@ class XGBoostTrainerScorer:
         
         # 3. Get movie features from DB
         movie_feats = self.db.fetch_one(
-            "SELECT lang, genres, keywords FROM movie_features WHERE tmdb_id = %s",
+            "SELECT lang, genres, keywords, production_countries FROM movie_features WHERE tmdb_id = %s",
             (tmdb_id,)
         )
         
@@ -272,6 +271,7 @@ class XGBoostTrainerScorer:
         # 4. Language one-hot
         lang = movie_feats.get("lang") or "en"
         lang_vocab = self.feature_schema["lang_vocab"]
+        # Use simple iteration or index lookup
         for l in lang_vocab:
             features.append(1.0 if lang == l else 0.0)
         
@@ -302,6 +302,31 @@ class XGBoostTrainerScorer:
         keyword_vocab = self.feature_schema["keyword_vocab"]
         for k in keyword_vocab:
             features.append(1.0 if k in keyword_names else 0.0)
+            
+        # 7. Production Countries multi-hot (New in Phase 12)
+        # Note: Must handle None or empty string gracefully
+        raw_countries = movie_feats.get("production_countries") or []
+        if isinstance(raw_countries, str):
+            raw_countries = json.loads(raw_countries)
+        
+        # Build set for faster lookup
+        country_vocab = self.feature_schema["country_vocab"]
+        # Countries are simple strings in the list
+        country_set = set(raw_countries)
+        
+        for c in country_vocab:
+            features.append(1.0 if c in country_set else 0.0)
+        
+        # 8. Decade one-hot (New in Phase 12)
+        decade_vocab = self.feature_schema["decade_vocab"]
+        
+        if release_year:
+            decade = (release_year // 10) * 10
+            for d in decade_vocab:
+                features.append(1.0 if decade == d else 0.0)
+        else:
+            # If no year, all zeros
+            features.extend([0.0] * len(decade_vocab))
         
         return np.array(features, dtype=np.float32)
 

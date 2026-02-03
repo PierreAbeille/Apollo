@@ -134,6 +134,10 @@ class TMDBFeatureSync:
                 genres=tmdb_data["details"].get("genres", []),
                 cast=tmdb_data["credits"].get("cast", [])[:8],
                 crew=metadata["crew"],
+                production_countries=metadata["production_countries"],
+                popularity=metadata["popularity"],
+                vote_average=metadata["vote_average"],
+                vote_count=metadata["vote_count"],
                 text_for_embedding=text
             )
             
@@ -155,12 +159,20 @@ class TMDBFeatureSync:
         # Connect to database
         self.db.connect()
         
-        # Get movies without features
-        movies = self.db.get_movies_without_features(self.lang)
+        # Get movies without features or missing Phase 12 data
+        # We check for movies where production_countries is NULL as proxy for missing newest data
+        query = """
+            SELECT m.*
+            FROM movies m
+            LEFT JOIN movie_features mf ON m.tmdb_id = mf.tmdb_id
+            WHERE mf.tmdb_id IS NULL OR mf.production_countries IS NULL
+            ORDER BY m.tmdb_id
+        """
+        movies = self.db.fetch_all(query)
         total_movies = len(movies)
         
         if total_movies == 0:
-            print(f"\n✓ All movies already have {self.lang} features!")
+            print(f"\\n✓ All movies already have {self.lang} features and Phase 12 data!")
             self.db.close()
             return
         

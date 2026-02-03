@@ -167,7 +167,6 @@ class DatabaseClient:
         """
         query = "SELECT * FROM interactions ORDER BY created_at DESC"
         return self.fetch_all(query)
-    
     def upsert_movie_features(
         self,
         tmdb_id: int,
@@ -177,6 +176,10 @@ class DatabaseClient:
         genres: Optional[list] = None,
         cast: Optional[list] = None,
         crew: Optional[list] = None,
+        production_countries: Optional[list] = None,
+        popularity: Optional[float] = None,
+        vote_average: Optional[float] = None,
+        vote_count: Optional[int] = None,
         text_for_embedding: Optional[str] = None
     ) -> None:
         """
@@ -190,6 +193,10 @@ class DatabaseClient:
             genres: List of genre dicts with 'id' and 'name'
             cast: List of cast member dicts
             crew: List of crew member dicts
+            production_countries: List of production country names
+            popularity: TMDB popularity score
+            vote_average: TMDB vote average
+            vote_count: TMDB vote count
             text_for_embedding: Pre-built text for embedding
         """
         import json
@@ -200,9 +207,11 @@ class DatabaseClient:
         
         query = """
             INSERT INTO movie_features (
-                tmdb_id, lang, overview, keywords, genres, \"cast\", \"crew\", text_for_embedding, tmdb_fetched_at
+                tmdb_id, lang, overview, keywords, genres, \"cast\", \"crew\", 
+                production_countries, popularity, vote_average, vote_count,
+                text_for_embedding, tmdb_fetched_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
             ON CONFLICT (tmdb_id)
             DO UPDATE SET
                 lang = EXCLUDED.lang,
@@ -211,6 +220,10 @@ class DatabaseClient:
                 genres = EXCLUDED.genres,
                 \"cast\" = EXCLUDED.\"cast\",
                 \"crew\" = EXCLUDED.\"crew\",
+                production_countries = EXCLUDED.production_countries,
+                popularity = EXCLUDED.popularity,
+                vote_average = EXCLUDED.vote_average,
+                vote_count = EXCLUDED.vote_count,
                 text_for_embedding = EXCLUDED.text_for_embedding,
                 tmdb_fetched_at = NOW()
         """
@@ -223,6 +236,10 @@ class DatabaseClient:
             json.dumps(genres or []),
             json.dumps(cast or []),
             json.dumps(crew or []),
+            json.dumps(production_countries or []),
+            popularity or 0,
+            vote_average or 0,
+            vote_count or 0,
             text_for_embedding
         ))
     

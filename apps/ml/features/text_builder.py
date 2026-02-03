@@ -94,6 +94,12 @@ def extract_movie_metadata(tmdb_details: Dict[str, Any], tmdb_credits: Dict[str,
     # Overview
     overview = tmdb_details.get("overview", "")
     
+    # New features for Phase 12
+    production_countries = [c["name"] for c in tmdb_details.get("production_countries", [])]
+    popularity = tmdb_details.get("popularity", 0.0)
+    vote_average = tmdb_details.get("vote_average", 0.0)
+    vote_count = tmdb_details.get("vote_count", 0)
+    
     return {
         "overview": overview,
         "genres": genres,
@@ -101,4 +107,8 @@ def extract_movie_metadata(tmdb_details: Dict[str, Any], tmdb_credits: Dict[str,
         "cast": cast,
         "crew": [{"name": director, "job": "Director"}] if director else [],
         "director": director,
+        "production_countries": production_countries,
+        "popularity": popularity,
+        "vote_average": vote_average,
+        "vote_count": vote_count,
     }

@@ -18,7 +18,7 @@ os.makedirs(EMBEDDINGS_DIR, exist_ok=True)
 DB_BATCH_SIZE = 100
 
 # TMDB
-TMDB_RATE_LIMIT_DELAY = 1.5  # seconds between API calls (safe limit for 50/min)
+TMDB_RATE_LIMIT_DELAY = 1.2  # seconds between API calls (limit 50/min)
 TMDB_MAX_RETRIES = 3
 TMDB_TIMEOUT = 10  # seconds
 
@@ -62,7 +62,7 @@ XGBOOST_LEARNING_RATE = 0.1
 TOP_GENRES = 20
 TOP_KEYWORDS = 300
 TOP_LANGUAGES = 10
-TOP_DIRECTORS = 50
+TOP_COUNTRIES = 20
 
 # Labeling thresholds
 POSITIVE_RATING_THRESHOLD = 9  # rating >= 8 -> y=1
