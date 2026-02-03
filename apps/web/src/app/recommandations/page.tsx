@@ -118,7 +118,7 @@ export default async function RecommandationsPage({
                                                                 <div className="w-full h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
                                                                     <div
                                                                         className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`}
-                                                                        style={{ width: `${Math.min(100, ((movie.mood_scores?.[0]?.similarity_score || 0) / 0.5) * 100)}%` }}
+                                                                        style={{ width: `${Math.min(100, ((movie.mood_scores?.[0]?.similarity_score || 0) / 0.6) * 100)}%` }}
                                                                     />
                                                                 </div>
                                                             </>

@@ -2,7 +2,7 @@
 """
 Pipeline 05: Build Mood Scores
 
-Calculates similarity scores between mood embeddings and all taste candidates.
+Calculates similarity scores between mood embeddings and all movies with embeddings.
 Pre-computes scores for efficient filtering in the web app.
 """
 import sys
@@ -21,7 +21,7 @@ from embeddings.encoder import MovieEncoder
 
 
 class MoodScoreBuilder:
-    """Builds mood similarity scores for all taste candidates."""
+    """Builds mood similarity scores for all movies with embeddings."""
     
     def __init__(self):
         """Initialize builder."""
@@ -83,10 +83,9 @@ class MoodScoreBuilder:
         
         return mood_embeddings
     
-    def get_taste_candidate_tmdb_ids(self) -> list[int]:
-        """Get all TMDB IDs from taste_candidates table."""
-        rows = self.db.fetch_all("SELECT tmdb_id FROM taste_candidates")
-        return [row["tmdb_id"] for row in rows]
+    def get_all_movie_tmdb_ids_with_embeddings(self, tmdb_to_index: dict[int, int]) -> list[int]:
+        """Get all TMDB IDs that have embeddings (covers candidates, wishlist, watched)."""
+        return list(tmdb_to_index.keys())
     
     def calculate_scores(
         self, 
@@ -217,17 +216,17 @@ class MoodScoreBuilder:
             # Encode moods
             mood_embeddings = self.encode_moods()
             
-            # Get candidate IDs
-            print("\nFetching taste candidates...")
-            candidate_ids = self.get_taste_candidate_tmdb_ids()
-            print(f"✓ Found {len(candidate_ids)} candidates")
+            # Get all movie IDs with embeddings
+            print("\nFetching all movies with embeddings...")
+            all_movie_ids = self.get_all_movie_tmdb_ids_with_embeddings(tmdb_to_index)
+            print(f"✓ Found {len(all_movie_ids)} movies with embeddings")
             
             # Calculate scores
             scores = self.calculate_scores(
                 mood_embeddings,
                 movie_embeddings,
                 tmdb_to_index,
-                candidate_ids
+                all_movie_ids
             )
             
             # Save to database
