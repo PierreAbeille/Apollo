@@ -57,11 +57,46 @@ python pipelines/04c_train_and_score_xgboost.py
 | `04b_build_training_dataset.py` | Construit X/y pour XGBoost (features V1: cosine, year, lang, genres, keywords) |
 | `04c_train_and_score_xgboost.py` | Entraîne, évalue (AUC/PR-AUC), et score les candidats |
 
-### Pipeline optionnel
+### Pipeline 05 - Système de Vibes (Mood Scores)
 
 | Pipeline | Description |
 |----------|-------------|
-| `05_build_mood_scores.py` | Calcule les scores mood↔film (18 moods) |
+| `05_build_mood_scores.py` | Calcule les scores mood↔film pour **tous les films avec embedding** |
+
+#### Concept
+
+Le système de "Vibes" permet de filtrer les films par **atmosphère** plutôt que par genre. Contrairement aux genres (Action, Comédie...), les vibes décrivent une **sensation** cross-genre.
+
+#### Les 9 Vibes
+
+| ID | Nom FR | Description |
+|----|--------|-------------|
+| `mind_bending` | Retourne le cerveau | Puzzles mentaux, twists (*Inception, Matrix*) |
+| `feel_good` | Ça fait du bien | Réconfortant, optimiste (*Intouchables, Amélie*) |
+| `dark_gritty` | Sombre & Réaliste | Viscéral, brut (*Joker, Se7en*) |
+| `tension` | Tension pure | Adrénaline, stress (*Mad Max, Whiplash*) |
+| `surreal` | Onirique & Étrange | Surréaliste, poétique (*Spirited Away*) |
+| `epic` | Grand Spectacle | Épique, grandiose (*Dune, Gladiator*) |
+| `intimate` | Intimiste & Calme | Contemplatif (*Lost in Translation*) |
+| `nostalgia` | Nostalgie | Rétro, mélancolie douce (*Stranger Things*) |
+| `disturbing` | Dérangeant & Viscéral | Malaise, provocant (*Midsommar*) |
+
+#### Algorithme
+
+1. **Encodage des vibes** : Chaque description de vibe → embedding 384D
+2. **Similarité cosinus** : Score = `cosine_similarity(movie_embedding, vibe_embedding)`
+3. **Stockage** : Table `movie_mood_scores(tmdb_id, mood_id, similarity_score)`
+
+#### Affichage (Frontend)
+
+Le score brut (0-1) est converti en note `/10` où **10/10 = 60%+ de similarité** :
+```
+score_display = min(10, round((similarity_score / 0.6) * 10))
+```
+
+#### Configuration (`config/moods.py`)
+
+Les vibes sont définies dans `MOODS` avec un `id`, `name`, et `description` servant à l'embedding.
 
 ## ⚙️ Configuration (`config/settings.py`)
 
