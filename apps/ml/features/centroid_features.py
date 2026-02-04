@@ -1,12 +1,16 @@
 """
-Multi-Centroid User Profile Features.
+Multi-Centroid User Profile Features (V1.5).
 
 Replaces single user_profile (average of positive embeddings) with a 
 multi-centroid representation using KMeans clustering.
 
 Features generated:
-- cos_pos_c0, cos_pos_c1, cos_pos_c2, cos_pos_c3, cos_pos_c4: Cosine similarity to each centroid
-- max_cos_pos: Maximum cosine similarity across all centroids
+- cos_pos_c0, cos_pos_c1, ...: Cosine similarity to each positive centroid
+- max_cos_pos: Maximum cosine similarity across all positive centroids
+- min_cos_pos: Minimum cosine similarity across all positive centroids (V1.5)
+- mean_cos_pos: Mean cosine similarity across all positive centroids (V1.5)
+- cos_to_neg_center: Cosine similarity to negative centroid (V1.5)
+- pos_neg_margin: max_cos_pos - cos_to_neg_center (V1.5)
 """
 import numpy as np
 from pathlib import Path
@@ -78,24 +82,64 @@ def compute_positive_centroids(
     return centroids, positive_embeddings
 
 
+def compute_negative_centroid(
+    embeddings: np.ndarray,
+    negative_tmdb_ids: List[int],
+    tmdb_to_index: Dict[int, int]
+) -> Optional[np.ndarray]:
+    """
+    Compute anti-centroid from negative movie embeddings (V1.5).
+    
+    The anti-centroid is the mean of all negatively-rated movie embeddings.
+    This helps the model learn to avoid movies similar to disliked ones.
+    
+    Args:
+        embeddings: Full embedding matrix (N x D)
+        negative_tmdb_ids: List of tmdb_ids for negative (disliked) movies
+        tmdb_to_index: Mapping from tmdb_id to embedding index
+        
+    Returns:
+        Anti-centroid vector (D,) or None if no negative embeddings found
+    """
+    negative_indices = []
+    for tmdb_id in negative_tmdb_ids:
+        if tmdb_id in tmdb_to_index:
+            negative_indices.append(tmdb_to_index[tmdb_id])
+    
+    if len(negative_indices) == 0:
+        print("  ⚠ No negative embeddings found, skipping anti-centroid")
+        return None
+    
+    negative_embeddings = embeddings[negative_indices]
+    anti_centroid = np.mean(negative_embeddings, axis=0)
+    
+    print(f"  ✓ Computed anti-centroid from {len(negative_indices)} negative movies")
+    return anti_centroid
+
+
 def compute_centroid_features(
     movie_embedding: np.ndarray,
-    centroids: np.ndarray
+    centroids: np.ndarray,
+    negative_centroid: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """
-    Compute cosine similarity features between a movie and all centroids.
+    Compute cosine similarity features between a movie and all centroids (V1.5).
     
     Args:
         movie_embedding: Single movie embedding vector (D,)
-        centroids: Centroid matrix (n_clusters x D)
+        centroids: Positive centroid matrix (n_clusters x D)
+        negative_centroid: Optional anti-centroid vector (D,) for V1.5 features
         
     Returns:
-        Feature vector: [cos_c0, cos_c1, ..., cos_cN-1, max_cos]
+        Feature vector: [cos_c0, ..., cos_cN-1, max_cos, min_cos, mean_cos, cos_neg, margin]
     """
     # Normalize movie embedding
     movie_norm = np.linalg.norm(movie_embedding)
     if movie_norm == 0:
-        return np.zeros(len(centroids) + 1)
+        n_base_features = len(centroids) + 4  # individual + max + min + mean + (neg, margin if available)
+        if negative_centroid is not None:
+            return np.zeros(n_base_features + 2)
+        return np.zeros(n_base_features)
     movie_normalized = movie_embedding / movie_norm
     
     # Normalize centroids
@@ -103,95 +147,147 @@ def compute_centroid_features(
     centroid_norms[centroid_norms == 0] = 1  # Avoid division by zero
     centroids_normalized = centroids / centroid_norms
     
-    # Compute cosine similarities
+    # Compute cosine similarities to positive centroids
     cosine_similarities = np.dot(centroids_normalized, movie_normalized)
     
-    # Maximum similarity
+    # V1.5: Extended statistics
     max_cos = np.max(cosine_similarities)
+    min_cos = np.min(cosine_similarities)
+    mean_cos = np.mean(cosine_similarities)
     
-    # Return features: individual cosines + max
-    return np.concatenate([cosine_similarities, [max_cos]])
+    # Build feature vector
+    features = list(cosine_similarities) + [max_cos, min_cos, mean_cos]
+    
+    # V1.5: Negative centroid features
+    if negative_centroid is not None:
+        neg_norm = np.linalg.norm(negative_centroid)
+        if neg_norm > 0:
+            neg_normalized = negative_centroid / neg_norm
+            cos_neg = float(np.dot(neg_normalized, movie_normalized))
+        else:
+            cos_neg = 0.0
+        
+        # Margin: how much closer to positives than negatives
+        margin = max_cos - cos_neg
+        features.extend([cos_neg, margin])
+    
+    return np.array(features, dtype=np.float32)
 
 
 def compute_centroid_features_batch(
     embeddings: np.ndarray,
     tmdb_ids: List[int],
     tmdb_to_index: Dict[int, int],
-    centroids: np.ndarray
+    centroids: np.ndarray,
+    negative_centroid: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """
-    Compute centroid features for a batch of movies.
+    Compute centroid features for a batch of movies (V1.5).
     
     Args:
         embeddings: Full embedding matrix (N x D)
         tmdb_ids: List of tmdb_ids to compute features for
         tmdb_to_index: Mapping from tmdb_id to embedding index
-        centroids: Centroid matrix (n_clusters x D)
+        centroids: Positive centroid matrix (n_clusters x D)
+        negative_centroid: Optional anti-centroid vector (D,)
         
     Returns:
-        Feature matrix (len(tmdb_ids) x (n_clusters + 1))
+        Feature matrix (len(tmdb_ids) x n_features)
     """
-    n_features = len(centroids) + 1  # cosines + max
+    # Calculate number of features
+    n_base = len(centroids) + 3  # cosines + max + min + mean
+    n_features = n_base + 2 if negative_centroid is not None else n_base
+    
     features = np.zeros((len(tmdb_ids), n_features))
     
     for i, tmdb_id in enumerate(tmdb_ids):
         if tmdb_id in tmdb_to_index:
             movie_emb = embeddings[tmdb_to_index[tmdb_id]]
-            features[i] = compute_centroid_features(movie_emb, centroids)
+            features[i] = compute_centroid_features(movie_emb, centroids, negative_centroid)
         # else: features remain zeros
     
     return features
 
 
-def get_centroid_feature_names(n_clusters: int = DEFAULT_N_CLUSTERS) -> List[str]:
+def get_centroid_feature_names(
+    n_clusters: int = DEFAULT_N_CLUSTERS,
+    include_negative: bool = False
+) -> List[str]:
     """
-    Get feature names for centroid-based features.
+    Get feature names for centroid-based features (V1.5).
     
     Args:
-        n_clusters: Number of clusters
+        n_clusters: Number of positive clusters
+        include_negative: Whether to include negative centroid features
         
     Returns:
-        List of feature names: ['cos_pos_c0', ..., 'cos_pos_cN-1', 'max_cos_pos']
+        List of feature names
     """
     names = [f"cos_pos_c{i}" for i in range(n_clusters)]
-    names.append("max_cos_pos")
+    names.extend(["max_cos_pos", "min_cos_pos", "mean_cos_pos"])
+    
+    if include_negative:
+        names.extend(["cos_to_neg_center", "pos_neg_margin"])
+    
     return names
 
 
 def save_centroids(
     centroids: np.ndarray,
     model_version: str,
-    models_dir: str
+    models_dir: str,
+    negative_centroid: Optional[np.ndarray] = None
 ) -> str:
     """
-    Save centroids to a numpy file.
+    Save centroids to numpy files (V1.5).
     
     Args:
-        centroids: Centroid matrix (n_clusters x D)
+        centroids: Positive centroid matrix (n_clusters x D)
         model_version: Model version string
         models_dir: Directory to save centroids
+        negative_centroid: Optional anti-centroid vector (D,)
         
     Returns:
-        Path to saved file
+        Path to saved positive centroids file
     """
-    filepath = Path(models_dir) / f"{model_version}_pos_centroids.npy"
-    np.save(filepath, centroids)
-    return str(filepath)
+    pos_filepath = Path(models_dir) / f"{model_version}_pos_centroids.npy"
+    np.save(pos_filepath, centroids)
+    
+    if negative_centroid is not None:
+        neg_filepath = Path(models_dir) / f"{model_version}_neg_centroid.npy"
+        np.save(neg_filepath, negative_centroid)
+        print(f"  💾 Saved negative centroid to {neg_filepath}")
+    
+    return str(pos_filepath)
 
 
-def load_centroids(model_version: str, models_dir: str) -> np.ndarray:
+def load_centroids(
+    model_version: str, 
+    models_dir: str,
+    load_negative: bool = True
+) -> Tuple[np.ndarray, Optional[np.ndarray]]:
     """
-    Load centroids from a numpy file.
+    Load centroids from numpy files (V1.5).
     
     Args:
         model_version: Model version string
         models_dir: Directory where centroids are saved
+        load_negative: Whether to attempt loading negative centroid
         
     Returns:
-        Centroid matrix (n_clusters x D)
+        Tuple of (positive_centroids, negative_centroid or None)
     """
-    filepath = Path(models_dir) / f"{model_version}_pos_centroids.npy"
-    return np.load(filepath)
+    pos_filepath = Path(models_dir) / f"{model_version}_pos_centroids.npy"
+    positive_centroids = np.load(pos_filepath)
+    
+    negative_centroid = None
+    if load_negative:
+        neg_filepath = Path(models_dir) / f"{model_version}_neg_centroid.npy"
+        if neg_filepath.exists():
+            negative_centroid = np.load(neg_filepath)
+            print(f"  ✓ Loaded negative centroid from {neg_filepath}")
+    
+    return positive_centroids, negative_centroid
 
 
 # ============================================================================
@@ -218,7 +314,7 @@ def test_compute_positive_centroids():
 
 
 def test_compute_centroid_features():
-    """Test feature computation for a single movie."""
+    """Test feature computation for a single movie (V1.5)."""
     # Create mock centroids (3 clusters, 4 dimensions)
     centroids = np.array([
         [1, 0, 0, 0],
@@ -229,16 +325,27 @@ def test_compute_centroid_features():
     # Movie aligned with first centroid
     movie_emb = np.array([1, 0, 0, 0], dtype=np.float64)
     
+    # Without negative centroid: 3 (cos) + 3 (max, min, mean) = 6 features
     features = compute_centroid_features(movie_emb, centroids)
     
-    assert len(features) == 4, f"Expected 4 features, got {len(features)}"
+    assert len(features) == 6, f"Expected 6 features (no neg), got {len(features)}"
     assert features[0] == 1.0, f"Expected cos_c0=1.0, got {features[0]}"
-    assert features[3] == 1.0, f"Expected max_cos=1.0, got {features[3]}"
+    assert features[3] == 1.0, f"Expected max_cos=1.0, got {features[3]}"  # max_cos_pos
+    assert features[4] == 0.0, f"Expected min_cos=0.0, got {features[4]}"  # min_cos_pos
+    
+    # With negative centroid: 6 + 2 (neg, margin) = 8 features
+    neg_centroid = np.array([-1, 0, 0, 0], dtype=np.float64)
+    features_neg = compute_centroid_features(movie_emb, centroids, neg_centroid)
+    
+    assert len(features_neg) == 8, f"Expected 8 features (with neg), got {len(features_neg)}"
+    assert features_neg[6] == -1.0, f"Expected cos_neg=-1.0, got {features_neg[6]}"  # cos_to_neg_center
+    assert features_neg[7] == 2.0, f"Expected margin=2.0, got {features_neg[7]}"  # pos_neg_margin
+    
     print("✓ test_compute_centroid_features passed")
 
 
 def test_compute_centroid_features_batch():
-    """Test batch feature computation."""
+    """Test batch feature computation (V1.5)."""
     np.random.seed(42)
     embeddings = np.random.randn(10, 8)
     centroids = np.random.randn(5, 8)
@@ -246,19 +353,30 @@ def test_compute_centroid_features_batch():
     tmdb_ids = [100, 200, 300]
     tmdb_to_index = {100: 0, 200: 1, 300: 2}
     
+    # Without negative: 5 + 3 = 8 features
     features = compute_centroid_features_batch(
         embeddings, tmdb_ids, tmdb_to_index, centroids
     )
     
-    assert features.shape == (3, 6), f"Expected (3, 6), got {features.shape}"
+    assert features.shape == (3, 8), f"Expected (3, 8), got {features.shape}"
     print("✓ test_compute_centroid_features_batch passed")
 
 
 def test_feature_names():
-    """Test feature name generation."""
-    names = get_centroid_feature_names(n_clusters=5)
-    expected = ['cos_pos_c0', 'cos_pos_c1', 'cos_pos_c2', 'cos_pos_c3', 'cos_pos_c4', 'max_cos_pos']
+    """Test feature name generation (V1.5)."""
+    # Without negative
+    names = get_centroid_feature_names(n_clusters=5, include_negative=False)
+    expected = ['cos_pos_c0', 'cos_pos_c1', 'cos_pos_c2', 'cos_pos_c3', 'cos_pos_c4', 
+                'max_cos_pos', 'min_cos_pos', 'mean_cos_pos']
     assert names == expected, f"Expected {expected}, got {names}"
+    
+    # With negative
+    names_neg = get_centroid_feature_names(n_clusters=5, include_negative=True)
+    expected_neg = ['cos_pos_c0', 'cos_pos_c1', 'cos_pos_c2', 'cos_pos_c3', 'cos_pos_c4', 
+                    'max_cos_pos', 'min_cos_pos', 'mean_cos_pos',
+                    'cos_to_neg_center', 'pos_neg_margin']
+    assert names_neg == expected_neg, f"Expected {expected_neg}, got {names_neg}"
+    
     print("✓ test_feature_names passed")
 
 

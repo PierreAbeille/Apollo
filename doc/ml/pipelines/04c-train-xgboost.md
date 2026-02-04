@@ -1,6 +1,6 @@
-# Pipeline 04c: Train and Score XGBoost
+# Pipeline 04c: Train and Score XGBoost (V1.5)
 
-> **Phase 3 de XGBoost** — Entraînement du modèle et scoring des candidats.
+> **Phase 3 de XGBoost** — Entraînement du modèle et scoring des candidats, avec **MMR reranking** pour la diversité.
 
 ---
 
@@ -17,10 +17,12 @@ Entraîner un classificateur XGBoost sur les données de Pipeline 04b, évaluer 
 - `data/train/y_train.parquet` : Labels
 - `data/train/feature_schema.json` : Vocabulaires
 - `data/cache/candidate_pool.json` : Films à scorer
+- `models/<version>_pos_centroids.npy` : Centroïdes positifs
+- `models/<version>_neg_centroid.npy` : Anti-centroïde (V1.5)
 
 **Output** :
 - `models/xgb_taste_v{date}_{hash}.json` : Modèle sauvegardé
-- Table `taste_candidates` : Recommandations avec scores
+- Table `taste_candidates` : Recommandations avec scores (rerankees par **MMR**)
 
 **Durée** : 1-5 minutes
 
@@ -48,54 +50,57 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 ---
 
-### Étape 2 : Entraîner XGBClassifier
+### Étape 2 : Entraîner XGBClassifier (Ordinal)
+
+Depuis V1.5, on utilise la **classification ordinale** (notes 1-10) plutôt que binaire :
 
 ```python
 model = xgb.XGBClassifier(
     n_estimators=XGBOOST_N_ESTIMATORS,  # 100
     max_depth=XGBOOST_MAX_DEPTH,         # 6
     learning_rate=XGBOOST_LEARNING_RATE, # 0.1
+    objective="multi:softprob",          # V1.5: Classification ordinale
+    num_class=9,                          # Ratings 2-10 (9 classes)
     random_state=XGBOOST_SEED,
-    use_label_encoder=False,
-    eval_metric="logloss",
+    eval_metric="mlogloss",              # V1.5: Multi-class log loss
 )
 
 model.fit(
     X_train, y_train,
     eval_set=[(X_test, y_test)],
-    verbose=True  # Affiche la progression
+    verbose=True
 )
 ```
 
-**Hyperparamètres par défaut** :
-- `n_estimators=100` : Nombre d'arbres de décision
-- `max_depth=6` : Profondeur max de chaque arbre
-- `learning_rate=0.1` : Vitesse d'apprentissage
+**V1.5** : Le modèle prédit une **distribution de probabilité** sur les notes 2-10.
 
 ---
 
-### Étape 3 : Évaluer les Performances
+### Étape 3 : Évaluer les Performances (V1.5)
 
 ```python
-y_pred_proba = model.predict_proba(X_test)[:, 1]
 y_pred = model.predict(X_test)
 
-auc_roc = roc_auc_score(y_test, y_pred_proba)
-auc_pr = average_precision_score(y_test, y_pred_proba)
+# Métriques ordinales
+accuracy = accuracy_score(y_test, y_pred)
+within_1 = np.mean(np.abs(y_test - y_pred) <= 1)
+within_2 = np.mean(np.abs(y_test - y_pred) <= 2)
+mae = mean_absolute_error(y_test, y_pred)
 
-print(f"AUC-ROC: {auc_roc:.4f}")
-print(f"AUC-PR:  {auc_pr:.4f}")
-print(classification_report(y_test, y_pred))
+print(f"Exact Accuracy: {accuracy:.2%}")
+print(f"Within ±1: {within_1:.2%}")
+print(f"Within ±2: {within_2:.2%}")
+print(f"MAE: {mae:.2f}")
 ```
 
-**Métriques clés** :
+**Métriques V1.5** :
 
 | Métrique | Description | Objectif |
 |----------|-------------|----------|
-| **AUC-ROC** | Capacité à distinguer positifs vs négatifs | > 0.7 |
-| **AUC-PR** | Performance sur les positifs (classe minoritaire) | > 0.6 |
-| **Precision** | % de prédictions positives correctes | > 0.7 |
-| **Recall** | % de vrais positifs trouvés | > 0.6 |
+| **Exact Accuracy** | % de notes exactement prédites | > 20% |
+| **Within ±1** | % de prédictions à ±1 point | > 60% |
+| **Within ±2** | % de prédictions à ±2 points | > 80% |
+| **MAE** | Erreur moyenne absolue | < 1.5 |
 
 ---
 
@@ -124,35 +129,64 @@ model.load_model("models/xgb_taste_v20260202_a1b2c3.json")
 with open("data/cache/candidate_pool.json") as f:
     candidates = json.load(f)["candidates"]
 
-# Scorer chaque candidat
+# Scorer chaque candidat avec Expected Rating
 scored = []
 for tmdb_id in candidates:
-    features = build_candidate_features(tmdb_id)  # Mêmes features que training
-    proba = model.predict_proba(features.reshape(1, -1))[0, 1]
-    scored.append((tmdb_id, float(proba)))
+    features = build_candidate_features(tmdb_id)  # Inclut features V1.5
+    probas = model.predict_proba(features.reshape(1, -1))[0]
+    
+    # V1.5: Expected Rating = Σ(proba × note)
+    expected_rating = sum(p * r for p, r in zip(probas, [2,3,4,5,6,7,8,9,10]))
+    scored.append((tmdb_id, expected_rating))
 
-# Trier et sauvegarder
 scored.sort(key=lambda x: x[1], reverse=True)
-top_candidates = scored[:MAX_TASTE_CANDIDATES]
-
-db.clear_taste_candidates()
-db.insert_taste_candidates(top_candidates, model_version)
 ```
-
-**Cohérence des features** : Le `feature_schema.json` garantit que les features sont construites exactement comme lors de l'entraînement.
 
 ---
 
-## 📊 Interprétation des Scores
+### Étape 6 : MMR Reranking (V1.5)
 
-### Score XGBoost vs Score Cosinus
+```python
+from features.mmr_reranker import mmr_rerank, compute_diversity_score
 
-| Aspect | Cosinus (ancien) | XGBoost (nouveau) |
-|--------|-----------------|-------------------|
-| **Range** | [-1, 1] | [0, 1] |
-| **Interprétation** | Similarité sémantique | Probabilité "tu vas aimer" |
-| **Features** | Embeddings seuls | Embeddings + metadata |
-| **Apprentissage** | Non supervisé | Supervisé (tes notes) |
+if MMR_ENABLED:
+    # Diversité avant
+    div_before = compute_diversity_score(scored, embeddings, tmdb_to_index, top_n=10)
+    
+    # Reranking MMR
+    reranked = mmr_rerank(
+        scored,
+        embeddings,
+        tmdb_to_index,
+        top_k=MMR_TOP_K,       # 200
+        lambda_param=MMR_LAMBDA # 0.7
+    )
+    
+    # Diversité après
+    div_after = compute_diversity_score(reranked, embeddings, tmdb_to_index, top_n=10)
+    print(f"Diversity: {div_before:.2%} → {div_after:.2%}")
+    
+    top_candidates = reranked[:MAX_TASTE_CANDIDATES]
+
+db.insert_taste_candidates(top_candidates, model_version)
+```
+
+**MMR (Maximal Marginal Relevance)** :
+- Balance pertinence (λ) vs diversité (1-λ)
+- Par défaut `λ = 0.7` = 70% pertinence, 30% diversité
+- Évite un top-10 trop homogène (ex: 10 films de la même franchise)
+
+---
+
+## 📊 Interprétation des Scores (V1.5)
+
+### Score V1.5 : Expected Rating
+
+| Aspect | V1 (binaire) | V1.5 (ordinal) |
+|--------|--------------|----------------|
+| **Range** | [0, 1] probabilité | [2, 10] note attendue |
+| **Interprétation** | "Probabilité d'aimer" | "Note que tu donnerais" |
+| **Plus intuitif** | Non | Oui |
 
 ---
 

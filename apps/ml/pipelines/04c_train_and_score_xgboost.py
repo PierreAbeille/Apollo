@@ -38,6 +38,9 @@ from config.settings import (
     XGBOOST_N_ESTIMATORS,
     XGBOOST_MAX_DEPTH,
     XGBOOST_LEARNING_RATE,
+    MMR_ENABLED,
+    MMR_LAMBDA,
+    MMR_TOP_K,
 )
 from clients.db import DatabaseClient
 from features.centroid_features import (
@@ -45,6 +48,7 @@ from features.centroid_features import (
     load_centroids,
     get_centroid_feature_names,
 )
+from features.mmr_reranker import mmr_rerank, compute_diversity_score
 
 # XGBoost and sklearn imports
 import xgboost as xgb
@@ -71,6 +75,7 @@ class XGBoostTrainerScorer:
         self.embeddings = None
         self.tmdb_to_index = None
         self.positive_centroids = None
+        self.negative_centroid = None  # V1.5
         self.n_clusters = None
         
         # Statistics
@@ -141,13 +146,19 @@ class XGBoostTrainerScorer:
         if self.feature_schema is None:
             self.feature_schema = self._load_feature_schema()
         
-        # Load centroids
+        # Load centroids (V1.5: includes negative centroid)
         centroids_version = self.feature_schema.get("centroids_version")
         if centroids_version:
-            self.positive_centroids = load_centroids(centroids_version, MODELS_DIR)
+            self.positive_centroids, self.negative_centroid = load_centroids(
+                centroids_version, 
+                MODELS_DIR,
+                load_negative=True
+            )
             self.n_clusters = self.feature_schema.get("n_clusters", 5)
             print(f"  Loaded centroids: {centroids_version}")
-            print(f"  Centroids shape: {self.positive_centroids.shape}")
+            print(f"  Positive centroids shape: {self.positive_centroids.shape}")
+            if self.negative_centroid is not None:
+                print(f"  Negative centroid loaded (V1.5)")
         else:
             raise ValueError("No centroids_version found in feature schema")
 
@@ -261,12 +272,18 @@ class XGBoostTrainerScorer:
         """Build feature vector for a candidate movie using the schema."""
         features = []
         
-        # 1. Multi-centroid cosine features (cos_pos_c0..c4 + max_cos_pos)
+        # 1. Multi-centroid cosine features (V1.5: includes min, mean, neg, margin)
         if tmdb_id in self.tmdb_to_index and self.positive_centroids is not None:
             movie_emb = self.embeddings[self.tmdb_to_index[tmdb_id]]
-            centroid_feats = compute_centroid_features(movie_emb, self.positive_centroids)
+            centroid_feats = compute_centroid_features(
+                movie_emb, 
+                self.positive_centroids,
+                self.negative_centroid  # V1.5
+            )
         else:
-            centroid_feats = np.zeros(self.n_clusters + 1)
+            # Number of features: n_clusters + 3 (max, min, mean) + 2 (neg, margin) if negative exists
+            n_feats = self.n_clusters + 3 + (2 if self.negative_centroid is not None else 0)
+            centroid_feats = np.zeros(n_feats)
         features.extend(centroid_feats)
         
         # 2. Release year (normalized)
@@ -406,9 +423,44 @@ class XGBoostTrainerScorer:
         print(f"\n  Scored: {len(scored_candidates)}")
         print(f"  Skipped (missing features): {skipped}")
         
-        # Sort by score and take top N
+        # Sort by score
         scored_candidates.sort(key=lambda x: x[1], reverse=True)
-        top_candidates = scored_candidates[:MAX_TASTE_CANDIDATES]
+        
+        # V1.5: MMR Reranking for diversity
+        if MMR_ENABLED and len(scored_candidates) > 10:
+            print(f"\n🔄 Applying MMR reranking (λ={MMR_LAMBDA}, top_k={MMR_TOP_K})...")
+            
+            # Compute diversity before
+            div_before = compute_diversity_score(
+                scored_candidates,
+                self.embeddings,
+                self.tmdb_to_index,
+                top_n=10
+            )
+            
+            # Rerank
+            reranked = mmr_rerank(
+                scored_candidates,
+                self.embeddings,
+                self.tmdb_to_index,
+                top_k=MMR_TOP_K,
+                lambda_param=MMR_LAMBDA
+            )
+            
+            # Compute diversity after
+            div_after = compute_diversity_score(
+                reranked,
+                self.embeddings,
+                self.tmdb_to_index,
+                top_n=10
+            )
+            
+            print(f"  Diversity (top-10): {div_before:.2%} → {div_after:.2%}")
+            
+            # Use reranked list
+            top_candidates = reranked[:MAX_TASTE_CANDIDATES]
+        else:
+            top_candidates = scored_candidates[:MAX_TASTE_CANDIDATES]
         
         # Insert into database
         print(f"\n💾 Inserting top {len(top_candidates)} candidates into taste_candidates...")

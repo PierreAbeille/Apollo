@@ -43,6 +43,7 @@ from config.settings import (
     EMBEDDINGS_DIR,
     POSITIVE_RATING_THRESHOLD,
     NEGATIVE_RATING_THRESHOLD,
+    ANTI_CENTROID_THRESHOLD,
     TOP_GENRES,
     TOP_KEYWORDS,
     TOP_LANGUAGES,
@@ -52,6 +53,7 @@ from clients.db import DatabaseClient
 from features.preference_score import calculate_user_profile
 from features.centroid_features import (
     compute_positive_centroids,
+    compute_negative_centroid,
     compute_centroid_features,
     get_centroid_feature_names,
     save_centroids,
@@ -75,6 +77,7 @@ class TrainingDatasetBuilder:
         
         # Will be computed during build
         self.positive_centroids = None
+        self.negative_centroid = None  # V1.5
         self.centroids_version = None
         self.genre_vocab = []
         self.keyword_vocab = []
@@ -190,7 +193,7 @@ class TrainingDatasetBuilder:
 
     def _build_features(self, tmdb_id: int, movie_features: dict) -> Optional[np.ndarray]:
         """
-        Build feature vector for a single movie.
+        Build feature vector for a single movie (V1.5).
         
         Args:
             tmdb_id: TMDB movie ID
@@ -201,12 +204,18 @@ class TrainingDatasetBuilder:
         """
         features = []
         
-        # 1. Multi-centroid cosine features (cos_pos_c0..c4 + max_cos_pos)
+        # 1. Multi-centroid cosine features (V1.5: includes min, mean, neg, margin)
         if tmdb_id in self.tmdb_to_index and self.positive_centroids is not None:
             movie_emb = self.embeddings[self.tmdb_to_index[tmdb_id]]
-            centroid_feats = compute_centroid_features(movie_emb, self.positive_centroids)
+            centroid_feats = compute_centroid_features(
+                movie_emb, 
+                self.positive_centroids,
+                self.negative_centroid  # V1.5
+            )
         else:
-            centroid_feats = np.zeros(self.n_clusters + 1)
+            # Number of features: n_clusters + 3 (max, min, mean) + 2 (neg, margin) if negative exists
+            n_feats = self.n_clusters + 3 + (2 if self.negative_centroid is not None else 0)
+            centroid_feats = np.zeros(n_feats)
         features.extend(centroid_feats)
         
         # 2. Release year (normalized)
@@ -254,8 +263,12 @@ class TrainingDatasetBuilder:
         return np.array(features, dtype=np.float32)
 
     def _save_feature_schema(self) -> None:
-        """Save feature schema for reproducible scoring."""
-        centroid_feature_names = get_centroid_feature_names(self.n_clusters)
+        """Save feature schema for reproducible scoring (V1.5)."""
+        has_negative = self.negative_centroid is not None
+        centroid_feature_names = get_centroid_feature_names(
+            self.n_clusters, 
+            include_negative=has_negative
+        )
         
         schema = {
             "feature_order": (
@@ -272,8 +285,10 @@ class TrainingDatasetBuilder:
             "decade_vocab": self.decade_vocab,
             "n_clusters": self.n_clusters,
             "centroids_version": self.centroids_version,
+            "has_negative_centroid": has_negative,  # V1.5
             "positive_threshold": POSITIVE_RATING_THRESHOLD,
             "negative_threshold": NEGATIVE_RATING_THRESHOLD,
+            "anti_centroid_threshold": ANTI_CENTROID_THRESHOLD,  # V1.5
         }
         
         schema_path = Path(TRAIN_DATA_DIR) / "feature_schema.json"
@@ -316,6 +331,20 @@ class TrainingDatasetBuilder:
             )
             print(f"  Computed {self.positive_centroids.shape[0]} centroids ({self.positive_centroids.shape[1]} dims)")
             
+            # V1.5: Compute negative centroid (anti-centroid)
+            print("\n🧠 Computing negative centroid (V1.5)...")
+            negative_tmdb_ids = [
+                i["tmdb_id"] for i in interactions 
+                if i.get("is_done") and i.get("rating") and i["rating"] <= ANTI_CENTROID_THRESHOLD
+            ]
+            print(f"  Found {len(negative_tmdb_ids)} negative movies (rating <= {ANTI_CENTROID_THRESHOLD})")
+            
+            self.negative_centroid = compute_negative_centroid(
+                self.embeddings,
+                negative_tmdb_ids,
+                self.tmdb_to_index
+            )
+            
             # Generate version and save centroids
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -323,9 +352,10 @@ class TrainingDatasetBuilder:
             centroids_path = save_centroids(
                 self.positive_centroids, 
                 self.centroids_version, 
-                MODELS_DIR
+                MODELS_DIR,
+                negative_centroid=self.negative_centroid  # V1.5
             )
-            print(f"  💾 Saved centroids to {centroids_path}")
+            print(f"  💾 Saved positive centroids to {centroids_path}")
             
             # Step 3: Load all movie features
             print("\n📊 Loading movie features...")
@@ -374,7 +404,11 @@ class TrainingDatasetBuilder:
                     self.stats["ignored_samples"] += 1
             
             # Step 6: Convert to DataFrames
-            centroid_feature_names = get_centroid_feature_names(self.n_clusters)
+            has_negative = self.negative_centroid is not None
+            centroid_feature_names = get_centroid_feature_names(
+                self.n_clusters,
+                include_negative=has_negative
+            )
             feature_names = (
                 centroid_feature_names
                 + ["release_year_normalized"]

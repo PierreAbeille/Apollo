@@ -1,6 +1,6 @@
-# Pipeline 04b: Build Training Dataset
+# Pipeline 04b: Build Training Dataset (V1.5)
 
-> **Phase 2 de XGBoost** — Construction des features et labels pour l'entraînement.
+> **Phase 2 de XGBoost** — Construction des features et labels pour l'entraînement, incluant l'**anti-centroid** pour éviter les films détestés.
 
 ---
 
@@ -21,7 +21,8 @@ Construire un dataset d'entraînement (X, y) à partir des films notés par l'ut
 - `data/train/X_train.parquet` : Features
 - `data/train/y_train.parquet` : Labels
 - `data/train/feature_schema.json` : Vocabulaires pour scoring
-- `models/<timestamp>_pos_centroids.npy` : Centroïdes sauvegardés
+- `models/<timestamp>_pos_centroids.npy` : Centroïdes positifs
+- `models/<timestamp>_neg_centroid.npy` : **Anti-centroïde (V1.5)**
 
 **Durée** : < 1 minute
 
@@ -29,9 +30,11 @@ Construire un dataset d'entraînement (X, y) à partir des films notés par l'ut
 
 ---
 
-## 🏷️ Règles de Labeling (V1)
+## 🏷️ Règles de Labeling (V1.5 — Ordinal)
 
-### Labels binaires
+### Labels ordinaux (notes 1-10)
+
+Depuis V1.5, on utilise les **notes brutes** comme labels pour une classification ordinale :
 
 ```python
 def get_label(interaction):
@@ -42,51 +45,51 @@ def get_label(interaction):
     if rating is None:
         return None  # Vu mais pas noté
     
-    if rating >= 8:
-        return 1  # Positif (tu as aimé)
-    elif rating <= 5:
-        return 0  # Négatif (tu n'as pas aimé)
-    else:
-        return None  # 6-7 = ambigu, ignorer
+    return rating  # Note brute 1-10
 ```
 
 **Mapping** :
 
-| Rating | Label | Interprétation |
-|--------|-------|----------------|
-| 8, 9, 10 | `y=1` | Positif (aimé) |
-| 6, 7 | Ignoré | Ambigu |
-| 1, 2, 3, 4, 5 | `y=0` | Négatif (pas aimé) |
+| Rating | Label | Usage spécial |
+|--------|-------|---------------|
+| 9, 10 | Ordinal | → Utilisé pour centroids positifs |
+| 6, 7, 8 | Ordinal | — |
+| 1, 2, 3, 4 | Ordinal | → Utilisé pour **anti-centroid** |
+| 5 | Ordinal | — |
 | Non noté | Ignoré | Pas de signal |
 
-**Pourquoi ignorer 6-7 ?**
-Ces notes sont ambiguës — ni vraiment aimé, ni vraiment détesté. Les inclure ajouterait du bruit au modèle.
+**Nouveau en V1.5** : Les films ≤4/10 servent à calculer l'**anti-centroid** (ce que tu détestes).
 
 ---
 
-## 📐 Features V2 (Multi-Centroïdes)
+## 📐 Features V1.5 (Multi-Centroïdes + Anti-Centroïde)
 
 ### Vue d'ensemble
 
 | Groupe | Feature | Dimension | Description |
 |--------|---------|-----------|-------------|
-| Centroïdes | `cos_pos_c0..c4` | 5 | Cosinus vers chaque centroïde positif |
-| Centroïdes | `max_cos_pos` | 1 | Maximum sur les 5 centroïdes |
+| Centroïdes+ | `cos_pos_c0..c4` | 5 | Cosinus vers chaque centroïde positif |
+| **V1.5** | `max_cos_pos` | 1 | Maximum sur les 5 centroïdes |
+| **V1.5** | `min_cos_pos` | 1 | Minimum sur les 5 centroïdes |
+| **V1.5** | `mean_cos_pos` | 1 | Moyenne sur les 5 centroïdes |
+| **V1.5** | `cos_to_neg_center` | 1 | Cosinus à l'anti-centroïde |
+| **V1.5** | `pos_neg_margin` | 1 | `max_cos_pos - cos_to_neg_center` |
 | Metadata | `release_year_normalized` | 1 | Année normalisée |
 | Language | `lang_*` | 10 | One-hot top 10 langues |
 | Genres | `genre_*` | 20 | Multi-hot top 20 genres |
 | Keywords | `kw_*` | 300 | Multi-hot top 300 keywords |
+| Decades | `decade_*` | ~10 | One-hot décennies |
 
-**Total** : ~337 features
+**Total** : ~341 features
 
 ---
 
-### Feature 1-6 : Multi-Centroïdes (KMeans)
+### Feature 1-10 : Multi-Centroïdes + Anti-Centroïde (V1.5)
 
-Au lieu d'une simple moyenne (user_profile), on capture la diversité des goûts via K centroïdes.
+**Centroids Positifs** (K-Means sur films ≥9/10) :
 
 ```python
-# 1. Extraire embeddings des films positifs (rating >= 8)
+# 1. Extraire embeddings des films positifs (rating >= 9)
 positive_embeddings = embeddings[positive_indices]
 
 # 2. KMeans clustering (K=5)
@@ -98,11 +101,29 @@ centroids = kmeans.cluster_centers_  # Shape: (5, 384)
 for i, centroid in enumerate(centroids):
     cos_pos_ci = cosine_similarity(movie_emb, centroid)
 
-# 4. Ajouter max_cos_pos pour capture rapide
-max_cos_pos = max(cos_pos_c0, cos_pos_c1, ..., cos_pos_c4)
+# 4. Statistiques étendues (V1.5)
+max_cos_pos = max(cos_pos_c0, ..., cos_pos_c4)
+min_cos_pos = min(cos_pos_c0, ..., cos_pos_c4)
+mean_cos_pos = mean(cos_pos_c0, ..., cos_pos_c4)
 ```
 
-**Avantage** : Capture les goûts variés (ex: sci-fi ET comédie romantique)
+**Anti-Centroïde (V1.5)** (moyenne des films ≤4/10) :
+
+```python
+# Films détestés (rating <= 4)
+negative_embeddings = embeddings[negative_indices]
+
+# Simple moyenne (pas de KMeans)
+anti_centroid = np.mean(negative_embeddings, axis=0)
+
+# Distance à l'anti-centroid
+cos_to_neg_center = cosine_similarity(movie_emb, anti_centroid)
+
+# Marge de sécurité
+pos_neg_margin = max_cos_pos - cos_to_neg_center
+```
+
+**Intuition** : Un film peut ressembler à ce que tu aimes ET à ce que tu détestes. `pos_neg_margin` discrimine ces cas.
 
 ---
 

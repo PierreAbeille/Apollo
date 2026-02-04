@@ -65,5 +65,14 @@ TOP_LANGUAGES = 10
 TOP_COUNTRIES = 20
 
 # Labeling thresholds
-POSITIVE_RATING_THRESHOLD = 9  # rating >= 8 -> y=1
+POSITIVE_RATING_THRESHOLD = 9  # rating >= 9 -> y=1
 NEGATIVE_RATING_THRESHOLD = 5  # rating <= 5 -> y=0
+
+# V1.5: Anti-centroid (negative profile)
+ANTI_CENTROID_THRESHOLD = 4  # rating <= 4 -> used for anti-centroid
+
+# V1.5: MMR Reranking
+MMR_ENABLED = True
+MMR_LAMBDA = 0.7  # 0.0 = full diversity, 1.0 = no diversity (only relevance)
+MMR_TOP_K = 200   # Apply MMR to top K candidates before final selection
+
