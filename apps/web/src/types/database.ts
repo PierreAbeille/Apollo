@@ -43,6 +43,39 @@ export interface TasteCandidate {
     mood_label_text?: string;
     mood_percentile?: number;
     dominant_emotion?: string;
-    dominant_emotion_score?: number;
 }
 
+// =============================================================================
+// Emotion Training Types
+// =============================================================================
+
+export type PrimaryEmotionDB = 'joy' | 'trust' | 'fear' | 'surprise' | 'sadness' | 'disgust' | 'anger' | 'anticipation';
+export type LabelKind = 'transmitted' | 'felt';
+
+export interface MovieEmotionLabel {
+    id: string;
+    tmdb_id: number;
+    emotion: PrimaryEmotionDB;
+    label_kind: LabelKind;
+    confidence_self: 1 | 2 | 3 | null;
+    source: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface MovieToLabel {
+    tmdb_id: number;
+    title: string;
+    release_year: number | null;
+    poster_path: string | null;
+    rating: number | null;
+    review_text: string | null;
+    overview: string | null;
+    is_labeled: boolean;
+}
+
+export interface EmotionTrainingProgress {
+    total: number;
+    labeled: number;
+    remaining: number;
+}

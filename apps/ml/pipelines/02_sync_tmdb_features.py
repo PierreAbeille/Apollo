@@ -141,6 +141,15 @@ class TMDBFeatureSync:
                 text_for_embedding=text
             )
             
+            # Also update poster_path in parent table if we have a better one
+            if tmdb_data["details"].get("poster_path"):
+                self.db.upsert_movie(
+                    tmdb_id=tmdb_id,
+                    title=tmdb_data["details"]["title"],
+                    release_year=int(tmdb_data["details"]["release_date"][:4]) if tmdb_data["details"].get("release_date") else None,
+                    poster_path=tmdb_data["details"]["poster_path"]
+                )
+            
             print(f"  ✓ Synced to database")
             self.stats["synced"] += 1
             return True
@@ -165,7 +174,7 @@ class TMDBFeatureSync:
             SELECT m.*
             FROM movies m
             LEFT JOIN movie_features mf ON m.tmdb_id = mf.tmdb_id
-            WHERE mf.tmdb_id IS NULL OR mf.production_countries IS NULL
+            WHERE mf.tmdb_id IS NULL OR mf.production_countries IS NULL OR m.poster_path IS NULL
             ORDER BY m.tmdb_id
         """
         movies = self.db.fetch_all(query)
