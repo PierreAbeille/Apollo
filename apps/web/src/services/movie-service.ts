@@ -3,6 +3,20 @@ import { cookies } from 'next/headers'
 import { Movie, Interaction, TasteCandidate, MoodScore } from '@/types/database'
 import { getMovieDetails, searchMovies } from '@/lib/tmdb'
 import { formatTasteScore } from '@/utils/format'
+import {
+    rerankWithMood,
+    getDominantEmotion,
+    getDyadFromPrimaries,
+    PRIMARY_ORDER,
+    MOOD_NAMES_FR,
+    MOOD_MATCH_LABELS,
+    type EmotionData,
+    type Mood,
+    type Preset,
+    type MoodIntensity
+} from '@/lib/mood-scorer'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 export async function getMovieService() {
     const cookieStore = await cookies()
@@ -147,55 +161,98 @@ export async function getMovieService() {
             return data;
         },
 
-        async getAllCandidatesPaginated(page = 1, pageSize = 50, moodId?: string): Promise<{ data: TasteCandidate[], count: number }> {
+        async getAllCandidatesPaginated(
+            page = 1,
+            pageSize = 50,
+            moodId?: string,
+            preset: Preset = 'congruence',
+            intensity: MoodIntensity = 'plutot'
+        ): Promise<{ data: TasteCandidate[], count: number }> {
             const from = (page - 1) * pageSize;
 
-            // If mood is selected, we filter and sort by mood similarity score
+            // If mood is selected, use Plutchik-based reranking
             if (moodId) {
-                // Get count first
-                const { data: countResult, error: countError } = await supabase
-                    .rpc('count_candidates_by_mood', {
-                        p_mood_id: moodId,
-                        p_min_score: 0.15
-                    });
+                // Load all candidates (we need full list for reranking)
+                const { data: allData, error: allError } = await supabase
+                    .from('taste_candidates')
+                    .select(`
+                        *,
+                        movies (
+                            title, 
+                            poster_path, 
+                            release_year,
+                            movie_features (genres, overview)
+                        )
+                    `)
+                    .order('taste_score', { ascending: false })
+                    .limit(300); // Top 300 for subtle reordering to match user preference
 
-                if (countError) throw countError;
+                if (allError) throw allError;
 
-                // Get paginated results using RPC
-                const { data, error } = await supabase
-                    .rpc('get_candidates_by_mood', {
-                        p_mood_id: moodId,
-                        p_min_score: 0.15,
-                        p_limit: pageSize,
-                        p_offset: from
-                    });
+                // Load emotion data from JSON
+                let emotionData: EmotionData = {};
+                try {
+                    const emotionPath = join(process.cwd(), 'public', 'data', 'movie_emotions.json');
+                    const emotionJson = await readFile(emotionPath, 'utf-8');
+                    emotionData = JSON.parse(emotionJson);
+                } catch (e) {
+                    console.warn('Could not load emotion data:', e);
+                }
 
-                if (error) throw error;
+                // Map to candidates with taste_score
+                const candidates = (allData || []).map((item: any) => {
+                    const movies = item.movies;
+                    const features = Array.isArray(movies?.movie_features)
+                        ? movies.movie_features[0]
+                        : movies?.movie_features;
 
-                // Map RPC results to TasteCandidate format
-                const candidates: TasteCandidate[] = (data || []).map((item: any) => ({
-                    id: item.id,
-                    tmdb_id: item.tmdb_id,
-                    taste_score: item.taste_score,
-                    taste_score_formatted: formatTasteScore(item.taste_score),
-                    model_version: item.model_version,
-                    generated_at: item.generated_at,
-                    title: item.title,
-                    poster_path: item.poster_path,
-                    release_year: item.release_year,
-                    mood_scores: [{
-                        mood_id: moodId,
-                        mood_name: moodId,
-                        similarity_score: item.similarity_score
-                    }]
-                }));
+                    return {
+                        ...item,
+                        tmdb_id: item.tmdb_id,
+                        taste_score: item.taste_score,
+                        title: movies?.title || item.title,
+                        poster_path: movies?.poster_path || item.poster_path,
+                        release_year: movies?.release_year || item.release_year,
+                        genres: features?.genres?.map((g: any) => g.name) || [],
+                        overview: features?.overview || item.overview,
+                        taste_score_formatted: formatTasteScore(item.taste_score)
+                    };
+                });
 
-                // Batch-hydrate the page
-                const hydrated = await hydrateWithTMDb(candidates);
+                // Rerank and filter by mood percentile
+                const mood = moodId as Mood;
+                const reranked = rerankWithMood(candidates, emotionData, mood, preset, intensity);
+
+                // Paginate
+                const paged = reranked.slice(from, from + pageSize);
+
+                // Add mood info for display
+                const finalCandidates: TasteCandidate[] = paged.map((c) => {
+                    const emotions = emotionData[c.tmdb_id.toString()];
+                    const dominant = emotions ? getDominantEmotion(emotions.e) : null;
+
+                    return {
+                        ...c,
+                        taste_score_formatted: formatTasteScore(c.taste_score),
+                        mood_scores: [{
+                            mood_id: moodId,
+                            mood_name: MOOD_NAMES_FR[mood],
+                            similarity_score: c.mood_score
+                        }],
+                        mood_label: c.mood_label,
+                        mood_label_text: MOOD_MATCH_LABELS[c.mood_label as keyof typeof MOOD_MATCH_LABELS],
+                        mood_percentile: c.mood_percentile,
+                        dominant_emotion: dominant?.emotion,
+                        dominant_emotion_score: dominant?.score
+                    } as TasteCandidate;
+                });
+
+                // Hydrate with TMDb
+                const hydrated = await hydrateWithTMDb(finalCandidates);
 
                 return {
                     data: hydrated,
-                    count: countResult || 0
+                    count: reranked.length
                 };
             }
 
@@ -243,26 +300,59 @@ export async function getMovieService() {
             };
         },
 
-        async getMoodScoresForMovie(tmdbId: number): Promise<MoodScore[]> {
-            const { data, error } = await supabase
-                .from('movie_mood_scores')
-                .select(`
-                    mood_id,
-                    similarity_score,
-                    moods (name)
-                `)
-                .eq('tmdb_id', tmdbId)
-                .gte('similarity_score', 0.15)
-                .order('similarity_score', { ascending: false })
-                .limit(5);
+        async getPlutchikEmotionsForMovie(tmdbId: number): Promise<{
+            emotions: number[];
+            confidence: number;
+            primaryEmotion: string;
+            primaryScore: number;
+            secondaryEmotion: string;
+            secondaryScore: number;
+            isDyad: boolean;
+            dyadName?: string;
+        } | null> {
+            try {
+                const emotionPath = join(process.cwd(), 'public', 'data', 'movie_emotions.json');
+                const emotionJson = await readFile(emotionPath, 'utf-8');
+                const emotionData: EmotionData = JSON.parse(emotionJson);
 
-            if (error) throw error;
+                const movieEmotions = emotionData[tmdbId.toString()];
+                if (!movieEmotions) return null;
 
-            return (data || []).map((item: any) => ({
-                mood_id: item.mood_id,
-                mood_name: item.moods?.name || item.mood_id,
-                similarity_score: item.similarity_score
-            }));
+                // Get top 2 emotions
+                const emotionScores = movieEmotions.e.map((score, idx) => ({
+                    emotion: PRIMARY_ORDER[idx],
+                    score
+                })).sort((a, b) => b.score - a.score);
+
+                const primary = emotionScores[0];
+                const secondary = emotionScores[1];
+
+                // Check if they form a dyad (adjacent emotions)
+                let isDyad = false;
+                let dyadName: string | undefined;
+
+                if (primary?.emotion && secondary?.emotion && secondary.score > 0.2) {
+                    const dyad = getDyadFromPrimaries(primary.emotion, secondary.emotion);
+                    if (dyad) {
+                        isDyad = true;
+                        dyadName = dyad;
+                    }
+                }
+
+                return {
+                    emotions: movieEmotions.e,
+                    confidence: movieEmotions.c,
+                    primaryEmotion: primary?.emotion || 'joy',
+                    primaryScore: primary?.score || 0,
+                    secondaryEmotion: secondary?.emotion || 'trust',
+                    secondaryScore: secondary?.score || 0,
+                    isDyad,
+                    dyadName
+                };
+            } catch (e) {
+                console.warn('Could not load emotion data for movie:', tmdbId, e);
+                return null;
+            }
         },
 
         async getAllMoods(): Promise<{ id: string; name: string }[]> {
@@ -287,24 +377,19 @@ export async function getMovieService() {
                 if (data) idMatch = data;
             }
 
-            // 2. Search by Title in DB (Split terms for better flexibility)
-            // Example: "Harry Pot" -> matches title containing "Harry" AND "Pot"
+            // 2. Search by Title in DB
             const terms = query.trim().split(/\s+/).filter(t => t.length > 0);
-
             let titleQuery = supabase.from('movies').select('*');
 
-            // Apply ILIKE for each term (AND logic)
-            // This allows "Potter Harry" to find "Harry Potter"
             terms.forEach(term => {
                 titleQuery = titleQuery.ilike('title', `%${term}%`);
             });
 
             const { data: titleMatches } = await titleQuery.limit(20);
 
-            // 3. Search in TMDb to cover VO titles, then check if they exist in DB
+            // 3. Search in TMDb
             let tmdbMatchesInDb: Movie[] = [];
             try {
-                // For TMDb, we use the original full query as it handles natural language well
                 const tmdbResults = await searchMovies(query);
                 if (tmdbResults.results.length > 0) {
                     const tmdbIds = tmdbResults.results.map(m => m.id);

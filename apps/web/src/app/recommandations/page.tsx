@@ -4,19 +4,22 @@ import { getImageUrl } from '@/lib/tmdb';
 import { GenreMoodFilter } from '@/components/recommendations/GenreMoodFilter';
 import { formatMoodScore } from '@/utils/mood-format';
 import { Suspense } from 'react';
+import { type Preset, type MoodIntensity } from '@/lib/mood-scorer';
 
 export default async function RecommandationsPage({
     searchParams
 }: {
-    searchParams: Promise<{ page?: string; mood?: string }>
+    searchParams: Promise<{ page?: string; mood?: string; preset?: string; intensity?: string }>
 }) {
     const params = await searchParams;
     const currentPage = parseInt(params.page || '1');
     const moodId = params.mood;
+    const preset = (params.preset || 'congruence') as Preset;
+    const intensity = (params.intensity || 'plutot') as MoodIntensity;
     const pageSize = 50;
 
     const service = await getMovieService();
-    const { data: candidates, count } = await service.getAllCandidatesPaginated(currentPage, pageSize, moodId);
+    const { data: candidates, count } = await service.getAllCandidatesPaginated(currentPage, pageSize, moodId, preset, intensity);
 
     const totalPages = Math.ceil(count / pageSize);
 
@@ -109,18 +112,15 @@ export default async function RecommandationsPage({
                                                     )}
                                                 </td>
                                                 <td className="p-4 text-right">
-                                                    <div className="inline-flex flex-col items-end">
-                                                        {moodId ? (
+                                                    <div className="inline-flex flex-col items-end gap-1">
+                                                        {moodId && movie.mood_label_text ? (
                                                             <>
-                                                                <span className={`text-xl font-black ${accentColor} tracking-tighter leading-none`}>
-                                                                    {formatMoodScore(movie.mood_scores?.[0]?.similarity_score || 0)}
+                                                                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded border ${movie.mood_label === 'beaucoup' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                                                                    movie.mood_label === 'bien' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                                                                        'bg-zinc-800 text-zinc-500 border-zinc-700'
+                                                                    }`}>
+                                                                    {movie.mood_label_text}
                                                                 </span>
-                                                                <div className="w-full h-1 bg-zinc-800 rounded-full mt-1 overflow-hidden">
-                                                                    <div
-                                                                        className={`h-full ${isNiche ? 'bg-success' : 'bg-accent'} transition-all`}
-                                                                        style={{ width: `${Math.min(100, ((movie.mood_scores?.[0]?.similarity_score || 0) / 0.6) * 100)}%` }}
-                                                                    />
-                                                                </div>
                                                             </>
                                                         ) : (
                                                             <>
@@ -165,7 +165,7 @@ export default async function RecommandationsPage({
                 <div className="flex items-center justify-center gap-2">
                     {currentPage > 1 && (
                         <Link
-                            href={`/recommandations?page=${currentPage - 1}${moodId ? `&mood=${moodId}` : ''}`}
+                            href={`/recommandations?page=${currentPage - 1}${moodId ? `&mood=${moodId}&preset=${preset}` : ''}`}
                             className="px-6 py-3 bg-base-200 border border-base-300 rounded-xl text-xs font-black uppercase tracking-widest hover:border-accent transition-colors"
                         >
                             Précédent
@@ -173,7 +173,7 @@ export default async function RecommandationsPage({
                     )}
                     {currentPage < totalPages && (
                         <Link
-                            href={`/recommandations?page=${currentPage + 1}${moodId ? `&mood=${moodId}` : ''}`}
+                            href={`/recommandations?page=${currentPage + 1}${moodId ? `&mood=${moodId}&preset=${preset}` : ''}`}
                             className="px-6 py-3 bg-base-200 border border-base-300 rounded-xl text-xs font-black uppercase tracking-widest hover:border-accent transition-colors"
                         >
                             Suivant

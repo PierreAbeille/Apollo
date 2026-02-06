@@ -38,5 +38,11 @@ export interface TasteCandidate {
     genres?: string[];
     is_niche?: boolean;
     mood_scores?: MoodScore[];
+    // Mood filter fields
+    mood_label?: string;
+    mood_label_text?: string;
+    mood_percentile?: number;
+    dominant_emotion?: string;
+    dominant_emotion_score?: number;
 }
 

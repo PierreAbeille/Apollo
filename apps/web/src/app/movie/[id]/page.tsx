@@ -14,12 +14,12 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
 
     try {
         const service = await getMovieService();
-        const [movie, credits, aiInsight, interaction, moodScores] = await Promise.all([
+        const [movie, credits, aiInsight, interaction, emotionData] = await Promise.all([
             getMovieDetails(movieId),
             getMovieCredits(movieId),
             service.getAIInsight(movieId),
             service.getInteraction(movieId),
-            service.getMoodScoresForMovie(movieId)
+            service.getPlutchikEmotionsForMovie(movieId)
         ]);
 
         const director = credits.crew.find(c => c.job === 'Director');
@@ -205,8 +205,16 @@ export default async function MoviePage({ params }: { params: Promise<{ id: stri
                         </div>
 
                         {/* Mood Analyzer Card */}
-                        {moodScores && moodScores.length > 0 && (
-                            <MoodAnalyzerCard moodScores={moodScores} isNiche={isNiche} />
+                        {emotionData && (
+                            <MoodAnalyzerCard
+                                primaryEmotion={emotionData.primaryEmotion}
+                                primaryScore={emotionData.primaryScore}
+                                secondaryEmotion={emotionData.secondaryEmotion}
+                                secondaryScore={emotionData.secondaryScore}
+                                isDyad={emotionData.isDyad}
+                                dyadName={emotionData.dyadName}
+                                isNiche={isNiche}
+                            />
                         )}
 
                         {/* AI Insight Section */}
