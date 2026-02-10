@@ -78,3 +78,9 @@ MMR_ENABLED = True
 MMR_LAMBDA = 0.7  # 0.0 = full diversity, 1.0 = no diversity (only relevance)
 MMR_TOP_K = 200   # Apply MMR to top K candidates before final selection
 
+# Grid Balancing Lab defaults
+GRIDLAB_DEFAULT_CV = 5
+GRIDLAB_DEFAULT_SEED = 42
+GRIDLAB_MAX_CONFIGS = 20
+GRIDLAB_DEFAULT_KW_SIZES = [0, 100, 300]
+

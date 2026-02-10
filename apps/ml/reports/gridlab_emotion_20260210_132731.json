@@ -1,0 +1,757 @@
+{
+  "metadata": {
+    "task": "emotion",
+    "n_samples": 156,
+    "n_total_features": 327,
+    "n_classes": 8,
+    "class_distribution": {
+      "0": 40,
+      "1": 17,
+      "2": 13,
+      "3": 27,
+      "4": 17,
+      "5": 8,
+      "6": 2,
+      "7": 32
+    },
+    "cv_folds": 3,
+    "seed": 42,
+    "kw_sizes": [
+      0,
+      100,
+      300
+    ],
+    "balancing_strategies": [
+      "none",
+      "class_weight",
+      "undersample"
+    ],
+    "keyword_vocab_size": 300,
+    "genre_vocab_size": 19,
+    "gridlab_version": "1.0.0",
+    "timestamp": "2026-02-10T13:27:31.358106"
+  },
+  "task": "emotion",
+  "gridlab_version": "1.0.0",
+  "experiments": [
+    {
+      "config_id": "emotion__ANCHOR__bal=none",
+      "blocks": [
+        "ANCHOR"
+      ],
+      "kw_size": 0,
+      "balancing": "none",
+      "n_features": 8,
+      "mean_metrics": {
+        "accuracy_top1": 0.358974358974359,
+        "accuracy_top2": 0.5705128205128204,
+        "macro_f1": 0.25476545796537586
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.03951547437800625,
+        "accuracy_top2": 0.04532735776836843,
+        "macro_f1": 0.07018557737716923
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.11007882148158885,
+        "accuracy_top2": 0.07945020013331996,
+        "macro_f1": 0.2754909473901594
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.40384615384615385,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.34340136054421766
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.3076923076923077,
+            "accuracy_top2": 0.5384615384615384,
+            "macro_f1": 0.17175925925925925
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.36538461538461536,
+            "accuracy_top2": 0.5384615384615384,
+            "macro_f1": 0.24913575409265065
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR__bal=class_weight",
+      "blocks": [
+        "ANCHOR"
+      ],
+      "kw_size": 0,
+      "balancing": "class_weight",
+      "n_features": 8,
+      "mean_metrics": {
+        "accuracy_top1": 0.28846153846153844,
+        "accuracy_top2": 0.48717948717948717,
+        "macro_f1": 0.2517319053856609
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.015701857325533204,
+        "accuracy_top2": 0.03268602252303069,
+        "macro_f1": 0.0209281629983523
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.05443310539518178,
+        "accuracy_top2": 0.06709236202095774,
+        "macro_f1": 0.0831367123141968
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.3076923076923077,
+            "accuracy_top2": 0.5192307692307693,
+            "macro_f1": 0.27622888620331076
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.2692307692307692,
+            "accuracy_top2": 0.5,
+            "macro_f1": 0.2538676236044657
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.28846153846153844,
+            "accuracy_top2": 0.4423076923076923,
+            "macro_f1": 0.22509920634920635
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR__bal=undersample",
+      "blocks": [
+        "ANCHOR"
+      ],
+      "kw_size": 0,
+      "balancing": "undersample",
+      "n_features": 8,
+      "mean_metrics": {
+        "accuracy_top1": 0.282051282051282,
+        "accuracy_top2": 0.5128205128205128,
+        "macro_f1": 0.24533250363764147
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.018130943107347388,
+        "accuracy_top2": 0.059446272407023736,
+        "macro_f1": 0.028097373128978143
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.06428243465332258,
+        "accuracy_top2": 0.1159202311936963,
+        "macro_f1": 0.11452772344621012
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.2692307692307692,
+            "accuracy_top2": 0.4807692307692308,
+            "macro_f1": 0.2828493311200078
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.3076923076923077,
+            "accuracy_top2": 0.5961538461538461,
+            "macro_f1": 0.21523569023569022
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.2692307692307692,
+            "accuracy_top2": 0.46153846153846156,
+            "macro_f1": 0.23791248955722638
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE__bal=none",
+      "blocks": [
+        "ANCHOR",
+        "GENRE"
+      ],
+      "kw_size": 0,
+      "balancing": "none",
+      "n_features": 27,
+      "mean_metrics": {
+        "accuracy_top1": 0.42948717948717946,
+        "accuracy_top2": 0.6474358974358975,
+        "macro_f1": 0.33507337475780674
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.04796996649710183,
+        "accuracy_top2": 0.009065471553673706,
+        "macro_f1": 0.07359386989535774
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.11169126527683411,
+        "accuracy_top2": 0.014002114478941565,
+        "macro_f1": 0.21963508723589834
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4807692307692308,
+            "accuracy_top2": 0.6538461538461539,
+            "macro_f1": 0.43623411028740616
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.36538461538461536,
+            "accuracy_top2": 0.6538461538461539,
+            "macro_f1": 0.26330419580419584
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.4423076923076923,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.30568181818181817
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE__bal=class_weight",
+      "blocks": [
+        "ANCHOR",
+        "GENRE"
+      ],
+      "kw_size": 0,
+      "balancing": "class_weight",
+      "n_features": 27,
+      "mean_metrics": {
+        "accuracy_top1": 0.4038461538461539,
+        "accuracy_top2": 0.6089743589743589,
+        "macro_f1": 0.3269903695775774
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.03140371465106639,
+        "accuracy_top2": 0.03626188621469472,
+        "macro_f1": 0.022714733954892184
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.0777615791359739,
+        "accuracy_top2": 0.05954583420518291,
+        "macro_f1": 0.06946606404413751
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4423076923076923,
+            "accuracy_top2": 0.5576923076923077,
+            "macro_f1": 0.3573066849212494
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.36538461538461536,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.32103163992869876
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.40384615384615385,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.3026327838827839
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE__bal=undersample",
+      "blocks": [
+        "ANCHOR",
+        "GENRE"
+      ],
+      "kw_size": 0,
+      "balancing": "undersample",
+      "n_features": 27,
+      "mean_metrics": {
+        "accuracy_top1": 0.4038461538461538,
+        "accuracy_top2": 0.5897435897435898,
+        "macro_f1": 0.32558152760058384
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.027196414661021066,
+        "accuracy_top2": 0.036261886214694776,
+        "macro_f1": 0.04658492265534347
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.0673435029701474,
+        "accuracy_top2": 0.06148754619013462,
+        "macro_f1": 0.1430822043211641
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4230769230769231,
+            "accuracy_top2": 0.5384615384615384,
+            "macro_f1": 0.3433686196844091
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.4230769230769231,
+            "accuracy_top2": 0.6153846153846154,
+            "macro_f1": 0.37162382636520563
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.36538461538461536,
+            "accuracy_top2": 0.6153846153846154,
+            "macro_f1": 0.2617521367521367
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE+KW__KW100__bal=none",
+      "blocks": [
+        "ANCHOR",
+        "GENRE",
+        "KW"
+      ],
+      "kw_size": 100,
+      "balancing": "none",
+      "n_features": 127,
+      "mean_metrics": {
+        "accuracy_top1": 0.44871794871794873,
+        "accuracy_top2": 0.6474358974358975,
+        "macro_f1": 0.36574926934981283
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.03951547437800626,
+        "accuracy_top2": 0.03951547437800626,
+        "macro_f1": 0.049866673641311976
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.08806305718527109,
+        "accuracy_top2": 0.061033802009593824,
+        "macro_f1": 0.13634114356526053
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4423076923076923,
+            "accuracy_top2": 0.6538461538461539,
+            "macro_f1": 0.41507936507936505
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.40384615384615385,
+            "accuracy_top2": 0.6923076923076923,
+            "macro_f1": 0.29743867243867245
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.5,
+            "accuracy_top2": 0.5961538461538461,
+            "macro_f1": 0.38472977053140095
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE+KW__KW100__bal=class_weight",
+      "blocks": [
+        "ANCHOR",
+        "GENRE",
+        "KW"
+      ],
+      "kw_size": 100,
+      "balancing": "class_weight",
+      "n_features": 127,
+      "mean_metrics": {
+        "accuracy_top1": 0.4230769230769231,
+        "accuracy_top2": 0.5961538461538461,
+        "macro_f1": 0.36645748970666875
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.056613851707229795,
+        "accuracy_top2": 0.04154320960517859,
+        "macro_f1": 0.06107453664370358
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.13381455858072497,
+        "accuracy_top2": 0.06968538385384797,
+        "macro_f1": 0.16666199589095793
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4423076923076923,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.44072107421861123
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.34615384615384615,
+            "accuracy_top2": 0.6153846153846154,
+            "macro_f1": 0.2911309523809524
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.4807692307692308,
+            "accuracy_top2": 0.5384615384615384,
+            "macro_f1": 0.36752044252044247
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE+KW__KW100__bal=undersample",
+      "blocks": [
+        "ANCHOR",
+        "GENRE",
+        "KW"
+      ],
+      "kw_size": 100,
+      "balancing": "undersample",
+      "n_features": 127,
+      "mean_metrics": {
+        "accuracy_top1": 0.3782051282051282,
+        "accuracy_top2": 0.608974358974359,
+        "macro_f1": 0.3233497966962297
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.018130943107347388,
+        "accuracy_top2": 0.01813094310734736,
+        "macro_f1": 0.025861076486126202
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.04793944279230835,
+        "accuracy_top2": 0.029772917102591452,
+        "macro_f1": 0.0799786384601359
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.36538461538461536,
+            "accuracy_top2": 0.5961538461538461,
+            "macro_f1": 0.358514392011929
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.36538461538461536,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.3144727470385365
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.40384615384615385,
+            "accuracy_top2": 0.5961538461538461,
+            "macro_f1": 0.29706225103822353
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE+KW__KW300__bal=none",
+      "blocks": [
+        "ANCHOR",
+        "GENRE",
+        "KW"
+      ],
+      "kw_size": 300,
+      "balancing": "none",
+      "n_features": 327,
+      "mean_metrics": {
+        "accuracy_top1": 0.4679487179487179,
+        "accuracy_top2": 0.6282051282051282,
+        "macro_f1": 0.3786973528981201
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.04796996649710183,
+        "accuracy_top2": 0.02398498324855091,
+        "macro_f1": 0.06614780408958965
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.10251116128147789,
+        "accuracy_top2": 0.03818017741606063,
+        "macro_f1": 0.1746719473568256
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4807692307692308,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.41851175252709777
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.40384615384615385,
+            "accuracy_top2": 0.5961538461538461,
+            "macro_f1": 0.28547979797979794
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.5192307692307693,
+            "accuracy_top2": 0.6538461538461539,
+            "macro_f1": 0.4321005081874647
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE+KW__KW300__bal=class_weight",
+      "blocks": [
+        "ANCHOR",
+        "GENRE",
+        "KW"
+      ],
+      "kw_size": 300,
+      "balancing": "class_weight",
+      "n_features": 327,
+      "mean_metrics": {
+        "accuracy_top1": 0.4358974358974359,
+        "accuracy_top2": 0.641025641025641,
+        "macro_f1": 0.37353549917990914
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.07080359626402093,
+        "accuracy_top2": 0.03951547437800626,
+        "macro_f1": 0.06619816055579389
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.1624317796645186,
+        "accuracy_top2": 0.06164414002968977,
+        "macro_f1": 0.17722053379432698
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.4423076923076923,
+            "accuracy_top2": 0.6923076923076923,
+            "macro_f1": 0.4108843537414966
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.34615384615384615,
+            "accuracy_top2": 0.5961538461538461,
+            "macro_f1": 0.28051665725578767
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.5192307692307693,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.42920548654244306
+          }
+        }
+      ]
+    },
+    {
+      "config_id": "emotion__ANCHOR+GENRE+KW__KW300__bal=undersample",
+      "blocks": [
+        "ANCHOR",
+        "GENRE",
+        "KW"
+      ],
+      "kw_size": 300,
+      "balancing": "undersample",
+      "n_features": 327,
+      "mean_metrics": {
+        "accuracy_top1": 0.4166666666666667,
+        "accuracy_top2": 0.6217948717948718,
+        "macro_f1": 0.38917171871691325
+      },
+      "std_metrics": {
+        "accuracy_top1": 0.04532735776836842,
+        "accuracy_top2": 0.03268602252303069,
+        "macro_f1": 0.02473698901759471
+      },
+      "cv_coefficient": {
+        "accuracy_top1": 0.10878565864408421,
+        "accuracy_top2": 0.052567211480338015,
+        "macro_f1": 0.06356317231671349
+      },
+      "folds": [
+        {
+          "fold": 0,
+          "metrics": {
+            "accuracy_top1": 0.38461538461538464,
+            "accuracy_top2": 0.6346153846153846,
+            "macro_f1": 0.3867794486215539
+          }
+        },
+        {
+          "fold": 1,
+          "metrics": {
+            "accuracy_top1": 0.38461538461538464,
+            "accuracy_top2": 0.5769230769230769,
+            "macro_f1": 0.3601422731857514
+          }
+        },
+        {
+          "fold": 2,
+          "metrics": {
+            "accuracy_top1": 0.4807692307692308,
+            "accuracy_top2": 0.6538461538461539,
+            "macro_f1": 0.4205934343434344
+          }
+        }
+      ]
+    }
+  ],
+  "winner": {
+    "config_id": "emotion__ANCHOR+GENRE+KW__KW100__bal=none",
+    "blocks": [
+      "ANCHOR",
+      "GENRE",
+      "KW"
+    ],
+    "kw_size": 100,
+    "balancing": "none",
+    "n_features": 127,
+    "mean_metrics": {
+      "accuracy_top1": 0.44871794871794873,
+      "accuracy_top2": 0.6474358974358975,
+      "macro_f1": 0.36574926934981283,
+      "confusion_matrix_agg": [
+        [
+          29,
+          4,
+          0,
+          3,
+          1,
+          0,
+          0,
+          3
+        ],
+        [
+          6,
+          2,
+          0,
+          5,
+          1,
+          0,
+          0,
+          3
+        ],
+        [
+          1,
+          1,
+          6,
+          2,
+          0,
+          1,
+          0,
+          2
+        ],
+        [
+          3,
+          2,
+          0,
+          12,
+          1,
+          1,
+          0,
+          8
+        ],
+        [
+          2,
+          5,
+          0,
+          4,
+          5,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          2,
+          2,
+          0,
+          2,
+          0,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          6,
+          1,
+          0,
+          10,
+          1,
+          0,
+          0,
+          14
+        ]
+      ]
+    }
+  },
+  "insights": [
+    "➡️ KW features have negligible impact on accuracy_top2",
+    "  KW(100): avg CV coefficient = 0.053",
+    "  KW(300): avg CV coefficient = 0.051",
+    "🏆 Best balancing strategy overall: 'none' (avg accuracy_top2=0.623)"
+  ]
+}
