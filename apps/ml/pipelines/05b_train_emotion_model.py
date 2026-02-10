@@ -33,7 +33,7 @@ from typing import Dict, List, Tuple, Optional
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.settings import EMOTIONS_DATA_DIR, MODELS_DIR, XGBOOST_SEED
+from config.settings import EMOTIONS_DATA_DIR, MODELS_DIR, XGBOOST_SEED, EMOTION_BALANCING
 from config.emotions import PRIMARY_ORDER
 
 from sklearn.linear_model import LogisticRegression
@@ -128,9 +128,11 @@ class EmotionModelTrainer:
         """Train logistic regression model."""
         print("\n🔧 Training LogisticRegression (multinomial)...")
         
+        # GridLab: 'none' balancing is best (avg top2=0.623)
+        # Removing class_weight='balanced' which was degrading performance
+        # (ANCHOR+GENRE bal=none: 64.7% vs bal=class_weight: 60.9%)
         base_model = LogisticRegression(
             solver="lbfgs",
-            class_weight="balanced",
             max_iter=2000,
             random_state=self.random_state,
         )
@@ -285,6 +287,7 @@ class EmotionModelTrainer:
             "n_classes": len(self.class_labels),
             "calibrated": self.calibrate,
             "model_type": "LogisticRegression",
+            "balancing": EMOTION_BALANCING,  # GridLab-optimized
         }
         
         schema_path = Path(MODELS_DIR) / f"{self.version}_schema.json"

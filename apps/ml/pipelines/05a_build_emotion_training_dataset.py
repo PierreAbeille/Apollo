@@ -39,7 +39,7 @@ from config.settings import (
     EMBEDDINGS_DIR,
     EMBEDDING_MODEL,
     TOP_GENRES,
-    TOP_KEYWORDS,
+    TOP_KEYWORDS_EMOTION,
 )
 from config.emotions import PRIMARY_ORDER, get_anchor_texts
 from clients.db import DatabaseClient
@@ -185,10 +185,11 @@ class EmotionTrainingDatasetBuilder:
                         keyword_counter[name] += 1
         
         self.genre_vocab = [g for g, _ in genre_counter.most_common(TOP_GENRES)]
-        self.keyword_vocab = [k for k, _ in keyword_counter.most_common(TOP_KEYWORDS)]
+        # GridLab: KW100 best F1/stability trade-off (CV coeff 0.053 vs 0.080 for KW300)
+        self.keyword_vocab = [k for k, _ in keyword_counter.most_common(TOP_KEYWORDS_EMOTION)]
         
         print(f"  Genres: {len(self.genre_vocab)}")
-        print(f"  Keywords: {len(self.keyword_vocab)}")
+        print(f"  Keywords: {len(self.keyword_vocab)} (GridLab: TOP_KEYWORDS_EMOTION={TOP_KEYWORDS_EMOTION})")
     
     def _encode_multi_hot(self, values: List[str], vocab: List[str]) -> np.ndarray:
         """Encode a list of values as multi-hot vector."""

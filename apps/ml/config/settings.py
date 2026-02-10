@@ -62,7 +62,9 @@ XGBOOST_LEARNING_RATE = 0.1
 
 # Feature engineering settings
 TOP_GENRES = 20
-TOP_KEYWORDS = 300
+TOP_KEYWORDS_TASTE = 0        # GridLab: KW features DEGRADE taste MAE (1.404 vs 1.109)
+TOP_KEYWORDS_EMOTION = 100    # GridLab: KW100 best F1/stability trade-off for emotion
+TOP_KEYWORDS = 300            # Legacy: full vocab for feature_schema (sliced at training time)
 TOP_LANGUAGES = 10
 TOP_COUNTRIES = 20
 
@@ -72,6 +74,17 @@ NEGATIVE_RATING_THRESHOLD = 5  # rating <= 5 -> y=0
 
 # V1.5: Anti-centroid (negative profile)
 ANTI_CENTROID_THRESHOLD = 4  # rating <= 4 -> used for anti-centroid
+
+# GridLab-optimized balancing strategies
+TASTE_BALANCING = "none"       # GridLab: 'none' is best (avg MAE=1.345)
+EMOTION_BALANCING = "none"     # GridLab: 'none' is best (avg top2=0.623)
+
+# GridLab-optimized feature blocks
+# Taste: COS_POS+NEG only (9 feats) → MAE 1.109, ±1=70.5%
+#   META/GENRE/KW all degrade performance (MAE 1.327+ vs 1.109)
+TASTE_FEATURE_BLOCKS = ["COS_POS", "NEG"]
+# Emotion: ANCHOR+GENRE+KW(100) → Top-2 64.7%, F1 0.366
+EMOTION_FEATURE_BLOCKS = ["ANCHOR", "GENRE", "KW"]
 
 # V1.5: MMR Reranking
 MMR_ENABLED = True

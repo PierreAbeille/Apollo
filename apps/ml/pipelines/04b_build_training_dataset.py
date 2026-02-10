@@ -46,8 +46,10 @@ from config.settings import (
     ANTI_CENTROID_THRESHOLD,
     TOP_GENRES,
     TOP_KEYWORDS,
+    TOP_KEYWORDS_TASTE,
     TOP_LANGUAGES,
     XGBOOST_SEED,
+    TASTE_FEATURE_BLOCKS,
 )
 from clients.db import DatabaseClient
 from features.preference_score import calculate_user_profile
@@ -165,16 +167,23 @@ class TrainingDatasetBuilder:
                 decade_counter[decade] += 1
 
 
-        # Take top N
-        self.genre_vocab = [g for g, _ in genre_counter.most_common(TOP_GENRES)]
-        self.keyword_vocab = [k for k, _ in keyword_counter.most_common(TOP_KEYWORDS)]
-        self.lang_vocab = [l for l, _ in lang_counter.most_common(TOP_LANGUAGES)]
-        self.decade_vocab = sorted([d for d, count in decade_counter.items() if count >= 5])
+        # Take top N - conditionally based on TASTE_FEATURE_BLOCKS
+        # GridLab: best taste config is COS_POS+NEG (9 feats, MAE=1.109)
+        # META/GENRE/KW all degrade performance
+        use_genre = "GENRE" in TASTE_FEATURE_BLOCKS or "META" in TASTE_FEATURE_BLOCKS
+        use_kw = "KW" in TASTE_FEATURE_BLOCKS
+        use_meta = "META" in TASTE_FEATURE_BLOCKS
         
-        print(f"  Genres: {len(self.genre_vocab)}")
-        print(f"  Keywords: {len(self.keyword_vocab)}")
-        print(f"  Languages: {len(self.lang_vocab)}")
-        print(f"  Decades: {len(self.decade_vocab)} ({self.decade_vocab})")
+        self.genre_vocab = [g for g, _ in genre_counter.most_common(TOP_GENRES)] if use_genre else []
+        self.keyword_vocab = [k for k, _ in keyword_counter.most_common(TOP_KEYWORDS_TASTE)] if (use_kw and TOP_KEYWORDS_TASTE > 0) else []
+        self.lang_vocab = [l for l, _ in lang_counter.most_common(TOP_LANGUAGES)] if use_meta else []
+        self.decade_vocab = sorted([d for d, count in decade_counter.items() if count >= 5]) if use_meta else []
+        
+        print(f"  Active blocks: {TASTE_FEATURE_BLOCKS}")
+        print(f"  Genres: {len(self.genre_vocab)}{' (disabled)' if not use_genre else ''}")
+        print(f"  Keywords: {len(self.keyword_vocab)}{' (disabled)' if not use_kw else ''}")
+        print(f"  Languages: {len(self.lang_vocab)}{' (disabled)' if not use_meta else ''}")
+        print(f"  Decades: {len(self.decade_vocab)}{' (disabled)' if not use_meta else ''}")
 
     def _encode_multi_hot(self, values: List[str], vocab: List[str]) -> np.ndarray:
         """Encode a list of values as multi-hot vector."""
@@ -193,7 +202,10 @@ class TrainingDatasetBuilder:
 
     def _build_features(self, tmdb_id: int, movie_features: dict) -> Optional[np.ndarray]:
         """
-        Build feature vector for a single movie (V1.5).
+        Build feature vector for a single movie.
+        
+        GridLab-optimized: only includes blocks listed in TASTE_FEATURE_BLOCKS.
+        Default: COS_POS + NEG = 9 features (MAE=1.109, ±1=70.5%)
         
         Args:
             tmdb_id: TMDB movie ID
@@ -204,91 +216,102 @@ class TrainingDatasetBuilder:
         """
         features = []
         
-        # 1. Multi-centroid cosine features (V1.5: includes min, mean, neg, margin)
+        # 1. Multi-centroid cosine features (COS_POS block — always included)
         if tmdb_id in self.tmdb_to_index and self.positive_centroids is not None:
             movie_emb = self.embeddings[self.tmdb_to_index[tmdb_id]]
             centroid_feats = compute_centroid_features(
                 movie_emb, 
                 self.positive_centroids,
-                self.negative_centroid  # V1.5
+                # NEG block: include negative centroid only if in TASTE_FEATURE_BLOCKS
+                self.negative_centroid if "NEG" in TASTE_FEATURE_BLOCKS else None
             )
         else:
-            # Number of features: n_clusters + 3 (max, min, mean) + 2 (neg, margin) if negative exists
-            n_feats = self.n_clusters + 3 + (2 if self.negative_centroid is not None else 0)
+            has_neg = "NEG" in TASTE_FEATURE_BLOCKS and self.negative_centroid is not None
+            n_feats = self.n_clusters + 3 + (2 if has_neg else 0)
             centroid_feats = np.zeros(n_feats)
         features.extend(centroid_feats)
         
-        # 2. Release year (normalized)
-        movie = self.db.get_movie_by_tmdb_id(tmdb_id)
-        release_year = movie.get("release_year") if movie else None
-        if release_year is None:
-            release_year = 2000  # Default
-        # Normalize to roughly [-1, 1] range (1900-2100 -> -1 to 1)
-        normalized_year = (release_year - 2000) / 50
-        features.append(normalized_year)
+        # 2. META block: release_year, language, decade
+        if "META" in TASTE_FEATURE_BLOCKS:
+            movie = self.db.get_movie_by_tmdb_id(tmdb_id)
+            release_year = movie.get("release_year") if movie else None
+            if release_year is None:
+                release_year = 2000
+            normalized_year = (release_year - 2000) / 50
+            features.append(normalized_year)
+            
+            lang = movie_features.get("lang") or "en"
+            lang_encoded = self._encode_one_hot(lang, self.lang_vocab)
+            features.extend(lang_encoded)
         
-        # 3. Language one-hot
-        lang = movie_features.get("lang") or "en"
-        lang_encoded = self._encode_one_hot(lang, self.lang_vocab)
-        features.extend(lang_encoded)
+        # 3. GENRE block
+        if "GENRE" in TASTE_FEATURE_BLOCKS or "META" in TASTE_FEATURE_BLOCKS:
+            if self.genre_vocab:
+                raw_genres = movie_features.get("genres") or []
+                if isinstance(raw_genres, str):
+                    raw_genres = json.loads(raw_genres)
+                genre_names = [g.get("name") if isinstance(g, dict) else g for g in raw_genres]
+                genre_names = [g for g in genre_names if g]
+                genres_encoded = self._encode_multi_hot(genre_names, self.genre_vocab)
+                features.extend(genres_encoded)
         
-        # 4. Genres multi-hot
-        raw_genres = movie_features.get("genres") or []
-        if isinstance(raw_genres, str):
-            raw_genres = json.loads(raw_genres)
-        genre_names = [g.get("name") if isinstance(g, dict) else g for g in raw_genres]
-        genre_names = [g for g in genre_names if g]
-        genres_encoded = self._encode_multi_hot(genre_names, self.genre_vocab)
-        features.extend(genres_encoded)
+        # 4. KW block
+        if "KW" in TASTE_FEATURE_BLOCKS and self.keyword_vocab:
+            raw_keywords = movie_features.get("keywords") or []
+            if isinstance(raw_keywords, str):
+                raw_keywords = json.loads(raw_keywords)
+            keyword_names = [k.get("name") if isinstance(k, dict) else k for k in raw_keywords]
+            keyword_names = [k for k in keyword_names if k]
+            keywords_encoded = self._encode_multi_hot(keyword_names, self.keyword_vocab)
+            features.extend(keywords_encoded)
         
-        # 5. Keywords multi-hot
-        raw_keywords = movie_features.get("keywords") or []
-        if isinstance(raw_keywords, str):
-            raw_keywords = json.loads(raw_keywords)
-        keyword_names = [k.get("name") if isinstance(k, dict) else k for k in raw_keywords]
-        keyword_names = [k for k in keyword_names if k]
-        keywords_encoded = self._encode_multi_hot(keyword_names, self.keyword_vocab)
-        features.extend(keywords_encoded)
-        
-        # 6. Decade one-hot (Phase 12 - Countries removed in Phase 13)
-        
-        # Decade one-hot
-        if release_year:
-            decade = (release_year // 10) * 10
-            decade_encoded = self._encode_one_hot(decade, self.decade_vocab)
-        else:
-            decade_encoded = np.zeros(len(self.decade_vocab))
-        features.extend(decade_encoded)
+        # 5. Decade one-hot (part of META block)
+        if "META" in TASTE_FEATURE_BLOCKS and self.decade_vocab:
+            if 'release_year' not in dir():
+                movie = self.db.get_movie_by_tmdb_id(tmdb_id)
+                release_year = movie.get("release_year") if movie else None
+            if release_year:
+                decade = (release_year // 10) * 10
+                decade_encoded = self._encode_one_hot(decade, self.decade_vocab)
+            else:
+                decade_encoded = np.zeros(len(self.decade_vocab))
+            features.extend(decade_encoded)
         
         return np.array(features, dtype=np.float32)
 
     def _save_feature_schema(self) -> None:
-        """Save feature schema for reproducible scoring (V1.5)."""
-        has_negative = self.negative_centroid is not None
+        """Save feature schema for reproducible scoring."""
+        has_negative = "NEG" in TASTE_FEATURE_BLOCKS and self.negative_centroid is not None
         centroid_feature_names = get_centroid_feature_names(
             self.n_clusters, 
             include_negative=has_negative
         )
         
+        # Build feature order based on active blocks
+        feature_order = list(centroid_feature_names)
+        if "META" in TASTE_FEATURE_BLOCKS:
+            feature_order += ["release_year_normalized"]
+            feature_order += [f"lang_{l}" for l in self.lang_vocab]
+        if self.genre_vocab:
+            feature_order += [f"genre_{g}" for g in self.genre_vocab]
+        if self.keyword_vocab:
+            feature_order += [f"kw_{k}" for k in self.keyword_vocab]
+        if "META" in TASTE_FEATURE_BLOCKS and self.decade_vocab:
+            feature_order += [f"decade_{d}" for d in self.decade_vocab]
+        
         schema = {
-            "feature_order": (
-                centroid_feature_names
-                + ["release_year_normalized"]
-                + [f"lang_{l}" for l in self.lang_vocab] 
-                + [f"genre_{g}" for g in self.genre_vocab]
-                + [f"kw_{k}" for k in self.keyword_vocab]
-                + [f"decade_{d}" for d in self.decade_vocab]
-            ),
+            "feature_order": feature_order,
+            "feature_blocks": TASTE_FEATURE_BLOCKS,  # GridLab-optimized
             "genre_vocab": self.genre_vocab,
             "keyword_vocab": self.keyword_vocab,
             "lang_vocab": self.lang_vocab,
             "decade_vocab": self.decade_vocab,
             "n_clusters": self.n_clusters,
             "centroids_version": self.centroids_version,
-            "has_negative_centroid": has_negative,  # V1.5
+            "has_negative_centroid": has_negative,
             "positive_threshold": POSITIVE_RATING_THRESHOLD,
             "negative_threshold": NEGATIVE_RATING_THRESHOLD,
-            "anti_centroid_threshold": ANTI_CENTROID_THRESHOLD,  # V1.5
+            "anti_centroid_threshold": ANTI_CENTROID_THRESHOLD,
         }
         
         schema_path = Path(TRAIN_DATA_DIR) / "feature_schema.json"
@@ -404,19 +427,21 @@ class TrainingDatasetBuilder:
                     self.stats["ignored_samples"] += 1
             
             # Step 6: Convert to DataFrames
-            has_negative = self.negative_centroid is not None
+            has_negative = "NEG" in TASTE_FEATURE_BLOCKS and self.negative_centroid is not None
             centroid_feature_names = get_centroid_feature_names(
                 self.n_clusters,
                 include_negative=has_negative
             )
-            feature_names = (
-                centroid_feature_names
-                + ["release_year_normalized"]
-                + [f"lang_{l}" for l in self.lang_vocab]
-                + [f"genre_{g}" for g in self.genre_vocab]
-                + [f"kw_{k}" for k in self.keyword_vocab]
-                + [f"decade_{d}" for d in self.decade_vocab]
-            )
+            feature_names = list(centroid_feature_names)
+            if "META" in TASTE_FEATURE_BLOCKS:
+                feature_names += ["release_year_normalized"]
+                feature_names += [f"lang_{l}" for l in self.lang_vocab]
+            if self.genre_vocab:
+                feature_names += [f"genre_{g}" for g in self.genre_vocab]
+            if self.keyword_vocab:
+                feature_names += [f"kw_{k}" for k in self.keyword_vocab]
+            if "META" in TASTE_FEATURE_BLOCKS and self.decade_vocab:
+                feature_names += [f"decade_{d}" for d in self.decade_vocab]
             
             X_df = pd.DataFrame(X_rows, columns=feature_names)
             X_df["tmdb_id"] = tmdb_ids

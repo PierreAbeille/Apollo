@@ -269,85 +269,110 @@ class XGBoostTrainerScorer:
         self.model.save_model(str(model_path))
 
     def _build_candidate_features(self, tmdb_id: int) -> Optional[np.ndarray]:
-        """Build feature vector for a candidate movie using the schema."""
-        features = []
+        """Build feature vector for a candidate movie using the schema.
         
-        # 1. Multi-centroid cosine features (V1.5: includes min, mean, neg, margin)
+        Respects feature_blocks from schema (GridLab-optimized).
+        """
+        features = []
+        feature_blocks = self.feature_schema.get("feature_blocks", 
+            ["COS_POS", "NEG", "META", "GENRE", "KW"])  # Legacy fallback
+        
+        # 1. COS_POS block: Multi-centroid cosine features
+        has_neg = "NEG" in feature_blocks and self.negative_centroid is not None
         if tmdb_id in self.tmdb_to_index and self.positive_centroids is not None:
             movie_emb = self.embeddings[self.tmdb_to_index[tmdb_id]]
             centroid_feats = compute_centroid_features(
                 movie_emb, 
                 self.positive_centroids,
-                self.negative_centroid  # V1.5
+                self.negative_centroid if has_neg else None
             )
         else:
-            # Number of features: n_clusters + 3 (max, min, mean) + 2 (neg, margin) if negative exists
-            n_feats = self.n_clusters + 3 + (2 if self.negative_centroid is not None else 0)
+            n_feats = self.n_clusters + 3 + (2 if has_neg else 0)
             centroid_feats = np.zeros(n_feats)
         features.extend(centroid_feats)
         
-        # 2. Release year (normalized)
-        movie = self.db.get_movie_by_tmdb_id(tmdb_id)
-        release_year = movie.get("release_year") if movie else None
-        if release_year is None:
-            release_year = 2000
-        normalized_year = (release_year - 2000) / 50
-        features.append(normalized_year)
-        
-        # 3. Get movie features from DB
-        movie_feats = self.db.fetch_one(
-            "SELECT lang, genres, keywords, production_countries FROM movie_features WHERE tmdb_id = %s",
-            (tmdb_id,)
-        )
-        
-        if movie_feats is None:
-            return None
-        
-        # 4. Language one-hot
-        lang = movie_feats.get("lang") or "en"
-        lang_vocab = self.feature_schema["lang_vocab"]
-        # Use simple iteration or index lookup
-        for l in lang_vocab:
-            features.append(1.0 if lang == l else 0.0)
-        
-        # 5. Genres multi-hot
-        raw_genres = movie_feats.get("genres") or []
-        if isinstance(raw_genres, str):
-            raw_genres = json.loads(raw_genres)
-        genre_names = set()
-        for g in raw_genres:
-            name = g.get("name") if isinstance(g, dict) else g
-            if name:
-                genre_names.add(name)
-        
-        genre_vocab = self.feature_schema["genre_vocab"]
-        for g in genre_vocab:
-            features.append(1.0 if g in genre_names else 0.0)
-        
-        # 6. Keywords multi-hot
-        raw_keywords = movie_feats.get("keywords") or []
-        if isinstance(raw_keywords, str):
-            raw_keywords = json.loads(raw_keywords)
-        keyword_names = set()
-        for k in raw_keywords:
-            name = k.get("name") if isinstance(k, dict) else k
-            if name:
-                keyword_names.add(name)
-        
-        keyword_vocab = self.feature_schema["keyword_vocab"]
-        for k in keyword_vocab:
-            features.append(1.0 if k in keyword_names else 0.0)
-        
-        # Decade one-hot
-        decade_vocab = self.feature_schema["decade_vocab"]
-        
-        if release_year:
-            decade = (release_year // 10) * 10
-            for d in decade_vocab:
-                features.append(1.0 if decade == d else 0.0)
+        # 2. META block: release_year, language
+        if "META" in feature_blocks:
+            movie = self.db.get_movie_by_tmdb_id(tmdb_id)
+            release_year = movie.get("release_year") if movie else None
+            if release_year is None:
+                release_year = 2000
+            normalized_year = (release_year - 2000) / 50
+            features.append(normalized_year)
+            
+            # Get movie features from DB
+            movie_feats = self.db.fetch_one(
+                "SELECT lang, genres, keywords FROM movie_features WHERE tmdb_id = %s",
+                (tmdb_id,)
+            )
+            if movie_feats is None:
+                return None
+            
+            lang = movie_feats.get("lang") or "en"
+            lang_vocab = self.feature_schema["lang_vocab"]
+            for l in lang_vocab:
+                features.append(1.0 if lang == l else 0.0)
         else:
-            # If no year, all zeros
-            features.extend([0.0] * len(decade_vocab))
+            # Still need movie_feats for GENRE/KW blocks
+            movie_feats = None
+            release_year = None
+        
+        # 3. GENRE block
+        genre_vocab = self.feature_schema["genre_vocab"]
+        if genre_vocab:
+            if movie_feats is None:
+                movie_feats = self.db.fetch_one(
+                    "SELECT genres, keywords FROM movie_features WHERE tmdb_id = %s",
+                    (tmdb_id,)
+                )
+                if movie_feats is None:
+                    return None
+            
+            raw_genres = movie_feats.get("genres") or []
+            if isinstance(raw_genres, str):
+                raw_genres = json.loads(raw_genres)
+            genre_names = set()
+            for g in raw_genres:
+                name = g.get("name") if isinstance(g, dict) else g
+                if name:
+                    genre_names.add(name)
+            for g in genre_vocab:
+                features.append(1.0 if g in genre_names else 0.0)
+        
+        # 4. KW block
+        keyword_vocab = self.feature_schema["keyword_vocab"]
+        if keyword_vocab:
+            if movie_feats is None:
+                movie_feats = self.db.fetch_one(
+                    "SELECT keywords FROM movie_features WHERE tmdb_id = %s",
+                    (tmdb_id,)
+                )
+                if movie_feats is None:
+                    return None
+            
+            raw_keywords = movie_feats.get("keywords") or []
+            if isinstance(raw_keywords, str):
+                raw_keywords = json.loads(raw_keywords)
+            keyword_names = set()
+            for k in raw_keywords:
+                name = k.get("name") if isinstance(k, dict) else k
+                if name:
+                    keyword_names.add(name)
+            for k in keyword_vocab:
+                features.append(1.0 if k in keyword_names else 0.0)
+        
+        # 5. Decade one-hot (part of META block)
+        decade_vocab = self.feature_schema.get("decade_vocab", [])
+        if "META" in feature_blocks and decade_vocab:
+            if release_year is None:
+                movie = self.db.get_movie_by_tmdb_id(tmdb_id)
+                release_year = movie.get("release_year") if movie else None
+            if release_year:
+                decade = (release_year // 10) * 10
+                for d in decade_vocab:
+                    features.append(1.0 if decade == d else 0.0)
+            else:
+                features.extend([0.0] * len(decade_vocab))
         
         return np.array(features, dtype=np.float32)
 

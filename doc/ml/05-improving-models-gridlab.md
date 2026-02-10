@@ -76,3 +76,55 @@ Comment intégrer GridLab dans votre cycle de développement :
     *   Sinon -> **Rejeter** (ne pas polluer le modèle de prod).
 
 C'est ainsi que nous garantissons une amélioration continue et maîtrisée de nos algorithmes de recommandation.
+
+---
+
+## Changements Appliqués (10/02/2026) — Suite aux Rapports GridLab
+
+Les rapports générés (`gridlab_taste_20260210_132426.md` et `gridlab_emotion_20260210_132731.md`) ont révélé des optimisations significatives. Voici ce qui a été modifié :
+
+### 🎯 Modèle Taste (XGBoost – Ordinal Classification)
+
+| Avant | Après | Impact |
+|-------|-------|--------|
+| ~340 features (COS+META+GENRE+KW300) | **9 features** (COS_POS+NEG) | MAE 1.577 → **1.109** |
+| `TOP_KEYWORDS = 300` | `TOP_KEYWORDS_TASTE = 0` | KW dégradaient le MAE |
+| Tous les blocs activés | `TASTE_FEATURE_BLOCKS = ["COS_POS", "NEG"]` | -97% de features |
+| Balancing variable | `TASTE_BALANCING = "none"` | Meilleure généralisation |
+
+**Insight clé** : Les mots-clés et les métadonnées (année, langue, décennie, genres) introduisaient du bruit sur notre petit dataset (156 films). Le modèle le plus simple, basé uniquement sur les similarités cosinus (centroids positifs + anti-centroid), généralise nettement mieux.
+
+### 😊 Modèle Emotion (Logistic Regression – Multi-class)
+
+| Avant | Après | Impact |
+|-------|-------|--------|
+| `TOP_KEYWORDS = 300` | `TOP_KEYWORDS_EMOTION = 100` | CV coeff 0.080 → 0.053 |
+| `class_weight="balanced"` | **Supprimé** (`bal=none`) | Top-2: 60.9% → **64.7%** |
+| `EMOTION_FEATURE_BLOCKS` implicite | `["ANCHOR", "GENRE", "KW"]` explicite | 127 features |
+
+**Insight clé** : Le `class_weight="balanced"` faisait sur-apprendre sur les classes minoritaires. Le modèle sans balancing est plus stable (+3.8% Top-2). Les KW(100) apportent un léger gain de F1 vs KW(0), mais KW(300) introduisait trop de variance.
+
+### Fichiers Modifiés
+
+| Fichier | Changement |
+|---------|------------|
+| `config/settings.py` | Nouveaux paramètres : `TOP_KEYWORDS_TASTE`, `TOP_KEYWORDS_EMOTION`, `TASTE_BALANCING`, `EMOTION_BALANCING`, `TASTE_FEATURE_BLOCKS`, `EMOTION_FEATURE_BLOCKS` |
+| `pipelines/04b_build_training_dataset.py` | Feature building conditionnel basé sur `TASTE_FEATURE_BLOCKS` |
+| `pipelines/04c_train_and_score_xgboost.py` | Scoring conditionnel, lit `feature_blocks` du schéma sauvegardé |
+| `pipelines/05a_build_emotion_training_dataset.py` | `TOP_KEYWORDS_EMOTION = 100` au lieu de 300 |
+| `pipelines/05b_train_emotion_model.py` | Suppression de `class_weight="balanced"` |
+
+### ⚠️ Re-training Requis
+
+Ces changements ne prennent effet qu'après un re-training complet :
+
+```bash
+# 1. Taste: rebuild dataset + retrain
+python pipelines/04b_build_training_dataset.py
+python pipelines/04c_train_and_score_xgboost.py
+
+# 2. Emotion: rebuild dataset + retrain + rescore
+python pipelines/05a_build_emotion_training_dataset.py
+python pipelines/05b_train_emotion_model.py
+python pipelines/05c_score_emotions_catalog.py
+```
