@@ -113,6 +113,15 @@ export const MOOD_NAMES_FR: Record<Mood, string> = {
     vigilance: 'Vigilance',
 };
 
+export const MOOD_EMOJI: Record<Mood, string> = {
+    joy: '😂', trust: '🤝', fear: '😱', surprise: '😲',
+    sadness: '😢', disgust: '🤢', anger: '😡', anticipation: '🤔',
+    love: '🥰', submission: '🙇', awe: '🤩', disapproval: '👎',
+    remorse: '😓', contempt: '😒', aggressiveness: '😤', optimism: '🤞',
+    ecstasy: '🤣', admiration: '😍', terror: '👹', amazement: '🤯',
+    grief: '😭', loathing: '🤮', rage: '🤬', vigilance: '🧐',
+};
+
 export const PRESET_NAMES_FR: Record<Preset, string> = {
     congruence: 'Rester dans le mood',
     regulation: 'Me changer les idées',
@@ -158,7 +167,8 @@ const T_STIMULATION: TransformationMatrix = {
     joy: { joy: 0, trust: 0, fear: 0, surprise: 0.6, sadness: 0, disgust: 0, anger: 0, anticipation: 0.4 },
 };
 
-const PRESETS: Record<Preset, TransformationMatrix> = {
+
+export const PRESETS: Record<Preset, TransformationMatrix> = {
     congruence: T_CONGRUENCE,
     regulation: T_REGULATION,
     stimulation: T_STIMULATION,
@@ -203,22 +213,28 @@ export function moodToPrimaryDistribution(mood: Mood): Record<PrimaryEmotion, nu
 }
 
 /**
- * Apply transformation matrix to get target emotion vector
+ * Apply regulation interpolation to get target emotion vector
+ * factor: 0.0 (congruence) to 1.0 (full regulation)
  */
-export function applyTransformation(mood: Mood, preset: Preset): number[] {
-    const T = PRESETS[preset];
+export function getInterpolatedTarget(mood: Mood, factor: number): number[] {
     const moodDist = moodToPrimaryDistribution(mood);
 
-    // E_target = Σ(mood_dist[p] × T[p])
+    // E_target = Σ(mood_dist[p] × T_interpolated[p])
+    // T_interpolated = (1-f)*T_cong + f*T_reg
     const target = PRIMARY_ORDER.map(() => 0);
 
     for (const primary of PRIMARY_ORDER) {
         const weight = moodDist[primary];
         if (weight > 0) {
-            const row = T[primary];
+            const rowCong = T_CONGRUENCE[primary];
+            const rowReg = T_REGULATION[primary];
+
             PRIMARY_ORDER.forEach((emo, i) => {
-                const targetValue = target[i];
-                target[i] = (targetValue ?? 0) + weight * (row[emo] ?? 0);
+                const valCong = rowCong[emo] ?? 0;
+                const valReg = rowReg[emo] ?? 0;
+                const mixed = (1 - factor) * valCong + factor * valReg;
+
+                target[i] = (target[i] ?? 0) + weight * mixed;
             });
         }
     }
@@ -230,6 +246,7 @@ export function applyTransformation(mood: Mood, preset: Preset): number[] {
     }
     return target;
 }
+
 
 /**
  * Compute mood score for a film
@@ -354,10 +371,12 @@ export function rerankWithMood<T extends Candidate>(
     candidates: T[],
     emotionData: EmotionData,
     mood: Mood,
-    preset: Preset,
+    regulation: number = 0, // 0 to 100
     intensity: MoodIntensity = 'plutot'
 ): (T & { mood_score: number; mood_percentile: number; mood_label: MoodMatchLabel })[] {
-    const targetEmotions = applyTransformation(mood, preset);
+    // Convert 0-100 to 0.0-1.0 factor, clamped
+    const factor = Math.min(Math.max(regulation, 0), 100) / 100.0;
+    const targetEmotions = getInterpolatedTarget(mood, factor);
 
     // Step 1: Calculate mood_score for each candidate
     const scored = candidates.map(candidate => {

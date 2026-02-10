@@ -4,22 +4,22 @@ import { getImageUrl } from '@/lib/tmdb';
 import { GenreMoodFilter } from '@/components/recommendations/GenreMoodFilter';
 import { formatMoodScore } from '@/utils/mood-format';
 import { Suspense } from 'react';
-import { type Preset, type MoodIntensity } from '@/lib/mood-scorer';
+import { MOOD_NAMES_FR, PRIMARY_ORDER, isDyad, getAllowedAdjacents, MOOD_EMOJI, type MoodIntensity } from '@/lib/mood-scorer';
 
 export default async function RecommandationsPage({
     searchParams
 }: {
-    searchParams: Promise<{ page?: string; mood?: string; preset?: string; intensity?: string }>
+    searchParams: Promise<{ page?: string; mood?: string; preset?: string; intensity?: string; regulation?: string }>
 }) {
     const params = await searchParams;
     const currentPage = parseInt(params.page || '1');
     const moodId = params.mood;
-    const preset = (params.preset || 'congruence') as Preset;
+    const regulation = parseInt(params.regulation || '0');
     const intensity = (params.intensity || 'plutot') as MoodIntensity;
     const pageSize = 50;
 
     const service = await getMovieService();
-    const { data: candidates, count } = await service.getAllCandidatesPaginated(currentPage, pageSize, moodId, preset, intensity);
+    const { data: candidates, count } = await service.getAllCandidatesPaginated(currentPage, pageSize, moodId, regulation, intensity);
 
     const totalPages = Math.ceil(count / pageSize);
 
@@ -41,9 +41,7 @@ export default async function RecommandationsPage({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
-                        <Suspense fallback={<div className="h-10 w-64 bg-base-200 rounded-xl animate-pulse" />}>
-                            <GenreMoodFilter />
-                        </Suspense>
+
                         <div className="px-4 py-2 bg-base-200 border border-base-300 rounded-xl shadow-inner h-[46px] flex flex-col justify-center">
                             <span className="text-[9px] font-black uppercase tracking-widest text-zinc-600 block mb-0.5 leading-none">Collection</span>
                             <span className="text-sm font-black text-white uppercase tracking-tighter">Batch v1.0</span>
@@ -55,6 +53,11 @@ export default async function RecommandationsPage({
                     </div>
                 </div>
 
+                {/* Mood Selection Hero */}
+                <Suspense fallback={<div className="h-32 w-full bg-base-200 rounded-xl animate-pulse" />}>
+                    <GenreMoodFilter />
+                </Suspense>
+
                 {/* Table View */}
                 <div className="bg-base-200 border border-base-300 rounded-2xl overflow-hidden shadow-2xl">
                     <div className="overflow-x-auto">
@@ -65,6 +68,7 @@ export default async function RecommandationsPage({
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Film</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Année</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500">Statut</th>
+                                    <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-center">Mood</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">{moodId ? 'Mood Match' : 'Score Global'}</th>
                                     <th className="p-4 py-3 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right pr-8">Détails</th>
                                 </tr>
@@ -134,6 +138,18 @@ export default async function RecommandationsPage({
                                                         )}
                                                     </div>
                                                 </td>
+                                                <td className="p-4 text-center">
+                                                    {movie.dominant_emotion ? (
+                                                        <div className="tooltip" data-tip={MOOD_NAMES_FR[movie.dominant_emotion as import('@/lib/mood-scorer').Mood]}>
+                                                            <span className="text-xl cursor-help grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all">
+                                                                {MOOD_EMOJI[movie.dominant_emotion as import('@/lib/mood-scorer').Mood]}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-zinc-700">-</span>
+                                                    )}
+                                                </td>
+
                                                 <td className="p-4 text-right pr-8">
                                                     <Link
                                                         href={`/movie/${movie.tmdb_id}`}
@@ -165,7 +181,7 @@ export default async function RecommandationsPage({
                 <div className="flex items-center justify-center gap-2">
                     {currentPage > 1 && (
                         <Link
-                            href={`/recommandations?page=${currentPage - 1}${moodId ? `&mood=${moodId}&preset=${preset}` : ''}`}
+                            href={`/recommandations?page=${currentPage - 1}${moodId ? `&mood=${moodId}&regulation=${regulation}&intensity=${intensity}` : ''}`}
                             className="px-6 py-3 bg-base-200 border border-base-300 rounded-xl text-xs font-black uppercase tracking-widest hover:border-accent transition-colors"
                         >
                             Précédent
@@ -173,7 +189,7 @@ export default async function RecommandationsPage({
                     )}
                     {currentPage < totalPages && (
                         <Link
-                            href={`/recommandations?page=${currentPage + 1}${moodId ? `&mood=${moodId}&preset=${preset}` : ''}`}
+                            href={`/recommandations?page=${currentPage + 1}${moodId ? `&mood=${moodId}&regulation=${regulation}&intensity=${intensity}` : ''}`}
                             className="px-6 py-3 bg-base-200 border border-base-300 rounded-xl text-xs font-black uppercase tracking-widest hover:border-accent transition-colors"
                         >
                             Suivant

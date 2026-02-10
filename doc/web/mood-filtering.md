@@ -32,35 +32,38 @@ interface FilmEmotions {
 }
 ```
 
-## Algorithme de Filtrage (Percentiles)
+## Algorithme de Scoring V2 (Vecteur Cible)
 
-Pour éviter les seuils arbitraires (ex: "score > 0.5"), nous utilisons une approche relative basée sur les **percentiles**.
+Depuis la v2 (Février 2026), nous n'utilisons plus de percentiles statiques stockés en base, mais un **calcul de similarité dynamique** côté client/serveur.
 
-### Problème résolu
-Un film d'horreur peut avoir un score de "Peur" de 0.9, alors qu'une comédie dramatique peut avoir un score de "Tristesse" max à 0.4. Comparer ces scores bruts est difficile.
+### 1. Construction du Vecteur Cible ($V_{target}$)
+Selon la position du slider (facteur $f \in [0, 1]$) :
+$$ V_{target} = f \cdot V_{regulation} + (1-f) \cdot V_{congruence} $$
 
-### Solution
-Pour chaque requête :
-1. On calcule le score de compatibilité (Mood Score) de chaque film du Top 300 avec l'émotion demandée.
-2. On classe ces 300 films du moins pertinent au plus pertinent.
-3. On assigne un **rang percentile** à chaque film (0 à 100).
-   - Le film le plus pertinent du lot a un percentile de 100.
-   - Le film médian a un percentile de 50.
+### 2. Scoring des Candidats
+Pour chaque film candidat $M$ ayant un vecteur émotion $V_{movie}$ :
+$$ Score(M) = CosineSimilarity(V_{target}, V_{movie}) $$
 
-### Niveaux d'Intensité
-
-L'utilisateur peut choisir l'intensité du filtre :
-- **"Plutôt"** : Garde les films du **Top 66%** (Percentile ≥ 33). Plus permissif.
-- **"Beaucoup"** : Garde les films du **Top 33%** (Percentile ≥ 66). Plus strict.
+### 3. Tri et Filtrage
+- Les films sont triés par ce score décroissant.
+- Le toggle "Intensité" filtre simplement les résultats pour ne garder que ceux ayant une similarité suffisante (ou affiner la sélection).
 
 ## Interface Utilisateur
 
 ### Sélecteur d'Émotions (`GenreMoodFilter`)
 - Permet de choisir 1 ou 2 émotions primaires.
 - Si 2 émotions adjacentes sont choisies, l'interface indique la Dyade correspondante (ex: "Amour").
-- **Presets** :
-  - *Congruence* : Cherche des films correspondant à l'émotion sélectionnée.
-  - *Régulation* : Cherche l'émotion opposée pour équilibrer (ex: Tristesse -> Joie).
+- **Régulation Continue (Slider 0-100)** :
+  - Remplace les presets discrets par un contrôle fin.
+  - **0 (Congruence)** : Cible = Vecteur de l'émotion choisie.
+  - **100 (Régulation/Antidote)** : Cible = Vecteur opposé (mélange pondéré défini dans `mood-scorer.ts`).
+  - **Interpolation** : Le vecteur cible est une interpolation linéaire entre le vecteur Congruence et le vecteur Régulation.
+
+### Niveaux d'Intensité (Toggle)
+
+- **"Plutôt"** : Correspondance > 0 (Large).
+- **"Beaucoup"** : Correspondance > 66% (Strict).
+- *Note : Le filtrage par percentiles a été remplacé par un tri par similarité cosinus avec le vecteur cible interpolé.*
 
 ### Labels UX
 Nous n'affichons jamais les pourcentages bruts à l'utilisateur dans la liste, mais des labels qualitatifs :

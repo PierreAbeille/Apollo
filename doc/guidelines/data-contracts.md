@@ -213,6 +213,43 @@ CREATE TABLE recommendation_history (
 
 ---
 
+### Table `movie_emotion_labels`
+
+Stocke les labels émotionnels soumis par l'utilisateur pour l'entraînement du modèle (vérité terrain).
+
+```sql
+CREATE TABLE movie_emotion_labels (
+    id SERIAL PRIMARY KEY,
+    tmdb_id INTEGER NOT NULL REFERENCES movies(tmdb_id),
+    emotion TEXT NOT NULL CHECK (emotion IN ('joy', 'trust', 'fear', 'surprise', 'sadness', 'disgust', 'anger', 'anticipation')),
+    intensity INTEGER DEFAULT 1 CHECK (intensity >= 1 AND intensity <= 5),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(tmdb_id, emotion)
+);
+
+CREATE INDEX idx_emotion_labels_tmdb ON movie_emotion_labels(tmdb_id);
+```
+
+**Colonnes** :
+- `id` : Identifiant unique
+- `tmdb_id` : Film concerné
+- `emotion` : Une des 8 émotions primaires de Plutchik
+- `intensity` : Force de l'émotion (1-5), par défaut 1
+- `created_at` : Date de création
+
+**Interface TypeScript** :
+```typescript
+export type PlutchikEmotion = 'joy' | 'trust' | 'fear' | 'surprise' | 'sadness' | 'disgust' | 'anger' | 'anticipation';
+
+export interface MovieEmotionLabel {
+    id: number;
+    tmdb_id: number;
+    emotion: PlutchikEmotion;
+    intensity: number;
+    created_at: string;
+}
+```
+
 ## 🔗 Relations
 
 ```mermaid

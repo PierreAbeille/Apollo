@@ -8,11 +8,13 @@ RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
 CACHE_DIR = os.path.join(DATA_DIR, "cache")
 LOGS_DIR = os.path.join(DATA_DIR, "logs")
 EMBEDDINGS_DIR = os.path.join(DATA_DIR, "embeddings")
+EMOTIONS_DATA_DIR = os.path.join(DATA_DIR, "emotions")
 
 # Ensure directories exist
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(LOGS_DIR, exist_ok=True)
 os.makedirs(EMBEDDINGS_DIR, exist_ok=True)
+os.makedirs(EMOTIONS_DATA_DIR, exist_ok=True)
 
 # Database
 DB_BATCH_SIZE = 100

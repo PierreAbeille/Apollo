@@ -370,4 +370,21 @@ class DatabaseClient:
         """
         
         self.execute(query, tuple(params))
+    
+    def get_emotion_labels(self, label_kind: str = "transmitted") -> List[Dict[str, Any]]:
+        """
+        Get emotion labels for training.
+        
+        Args:
+            label_kind: Type of label to fetch ('transmitted' or 'felt')
+            
+        Returns:
+            List of label records with tmdb_id and emotion
+        """
+        query = """
+            SELECT tmdb_id, emotion, label_kind, confidence_self
+            FROM movie_emotion_labels
+            WHERE label_kind = %s
+        """
+        return self.fetch_all(query, (label_kind,))
 

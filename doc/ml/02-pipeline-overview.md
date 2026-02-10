@@ -64,11 +64,10 @@ flowchart TD
     
     Cache --> P05
     
-    subgraph P05["Pipeline 05: Build Mood Scores"]
-        E1[18 Moods config] --> E2[Encoder moods]
-        E2 --> E3[Cosine similarity]
-        E3 --> E4[Filtrer seuil 15%]
-        E4 --> E5[Insérer movie_mood_scores]
+    subgraph P05["Pipeline 05: Supervised Emotion Model (v2)"]
+        E1[Labels Utilisateur] --> E2[Train LogisticRegression]
+        E2 --> E3[Score Catalog]
+        E3 --> E4[Générer static JSON]
     end
     
     P05 --> DB4[(PostgreSQL: moods + movie_mood_scores)]
@@ -98,7 +97,7 @@ flowchart TD
 | **04a** | `interactions` (films 8+) | `candidate_pool.json` | 5-10 min | TMDb Similar |
 | **04b** | `interactions` + `movie_features` | `X_train.parquet`, `y_train.parquet` | < 1 min | Aucun |
 | **04c** | Training data + candidates | `taste_candidates` (XGBoost) | 1-5 min | Aucun |
-| **05** | `config/moods.py` + embeddings | `movie_mood_scores` | < 1 min | Aucun |
+| **05** | `movie_emotion_labels` + embeddings | `movie_emotions.json` | ~30s | Aucun |
 
 **Temps total première exécution** : ~20-40 minutes (selon nombre de films et connexion)
 
@@ -258,6 +257,33 @@ python pipelines/04c_train_and_score_xgboost.py --score-only
 - Upserts pour éviter doublons
 
 **[Documentation détaillée →](pipelines/04-build-candidates.md)**
+
+---
+
+### Pipeline 05 : Emotion Vector v2 (Supervised)
+
+**Fichiers** : 
+- `pipelines/05a_build_emotion_training_dataset.py`
+- `pipelines/05b_train_emotion_model.py`
+- `pipelines/05c_score_emotions_catalog.py`
+
+**Responsabilités** :
+1. **Dataset** : Créer un dataset d'entraînement à partir des labels utilisateurs (`movie_emotion_labels`) et des "anchor logits".
+2. **Train** : Entraîner une régression logistique multilogit pour prédire 8 émotions.
+3. **Score** : Appliquer le modèle sur tout le catalogue.
+4. **Publish** : Générer `public/data/movie_emotions.json` (environ 2MB).
+
+**Inputs** :
+- `movie_emotion_labels` (Vérité terrain)
+- `movie_embeddings.npy`
+
+**Outputs** :
+- `apps/web/public/data/movie_emotions.json` : Probabilités + Dominante pour le frontend.
+
+**Pourquoi pas en DB ?** :
+Pour la rapidité d'exécution et la simplicité de l'algorithme "stateless" côté frontend (voir `doc/ml/pipelines/05-emotion-vector-v2.md`).
+
+**[Documentation détaillée →](pipelines/05-emotion-vector-v2.md)**
 
 ---
 

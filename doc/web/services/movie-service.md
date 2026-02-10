@@ -63,34 +63,38 @@ const stats = await service.getStats();
 
 | Méthode | Return | Description |
 |---------|--------|-------------|
-| `getAllCandidatesPaginated(page, pageSize, moodId?)` | `{ data, count }` | Candidats paginés, filtrables par mood |
+| `getAllCandidatesPaginated(page, pageSize, moodId?, regulation?, intensity?)` | `{ data, count }` | Candidats paginés, filtrables par mood + regulation |
 | `getAllMoods()` | `{ id, name }[]` | Liste des moods disponibles |
 
 ---
 
 ## 🎭 Filtrage par Mood
 
-La méthode `getAllCandidatesPaginated` supporte un paramètre optionnel `moodId` :
+La méthode `getAllCandidatesPaginated` supporte désormais la régulation émotionnelle :
 
 ```typescript
-// Sans filtre - top 2000 par taste_score
+// Sans filtre
 const { data, count } = await service.getAllCandidatesPaginated(1, 50);
 
-// Avec filtre mood - triés par similarity_score
-const { data, count } = await service.getAllCandidatesPaginated(1, 50, 'animation');
+// Avec filtre mood simple (Congruence)
+const { data, count } = await service.getAllCandidatesPaginated(1, 50, 'joy', 0, 'plutot');
+
+// Avec régulation (Antidote - ex: Sadness -> Joy)
+const { data, count } = await service.getAllCandidatesPaginated(1, 50, 'sadness', 100, 'beaucoup');
 ```
 
-### Fonctionnement
+### Fonctionnement V2 (Client-Side Logic)
 
-1. **Avec mood** : Appel RPC `get_candidates_by_mood` (seuil 15%, tri par similarity)
-2. **Sans mood** : Query Supabase standard (tri par taste_score)
+Contrairement à la V1 (RPC), la V2 utilise un fichier JSON statique (`movie_emotions.json`) chargés en mémoire serveur :
 
-### Fonctions RPC utilisées
+1.  **Chargement** : Le service charge `movie_emotions.json` (map tmdb_id -> vector).
+2.  **Filtrage** : 
+    - Calcule le vecteur cible (Target) basé sur le mood sélectionné et le slider de régulation (interpolation linéaire).
+    - Calcule la similarité cosinus entre chaque film candidat et le vecteur cible.
+3.  **Tri** : Réordonne les candidats par ce nouveau score de similarité.
+4.  **Pagination** : Renvoie la page demandée.
 
-| Fonction | Paramètres | Description |
-|----------|------------|-------------|
-| `get_candidates_by_mood` | `p_mood_id, p_min_score, p_limit, p_offset` | Récupère candidats filtrés |
-| `count_candidates_by_mood` | `p_mood_id, p_min_score` | Compte candidats pour pagination |
+*Note : Les RPC `get_candidates_by_mood` sont dépréciées en faveur de cette approche "stateless" et plus flexible.*
 
 ---
 

@@ -165,7 +165,7 @@ export async function getMovieService() {
             page = 1,
             pageSize = 50,
             moodId?: string,
-            preset: Preset = 'congruence',
+            regulation: number = 0,
             intensity: MoodIntensity = 'plutot'
         ): Promise<{ data: TasteCandidate[], count: number }> {
             const from = (page - 1) * pageSize;
@@ -221,7 +221,7 @@ export async function getMovieService() {
 
                 // Rerank and filter by mood percentile
                 const mood = moodId as Mood;
-                const reranked = rerankWithMood(candidates, emotionData, mood, preset, intensity);
+                const reranked = rerankWithMood(candidates, emotionData, mood, regulation, intensity);
 
                 // Paginate
                 const paged = reranked.slice(from, from + pageSize);
@@ -273,12 +273,25 @@ export async function getMovieService() {
 
             if (error) throw error;
 
+            // Load emotion data from JSON
+            let emotionData: EmotionData = {};
+            try {
+                const emotionPath = join(process.cwd(), 'public', 'data', 'movie_emotions.json');
+                const emotionJson = await readFile(emotionPath, 'utf-8');
+                emotionData = JSON.parse(emotionJson);
+            } catch (e) {
+                console.warn('Could not load emotion data:', e);
+            }
+
             // Map results
             let candidates: TasteCandidate[] = (data || []).map((item: any) => {
                 const movies = item.movies;
                 const features = Array.isArray(movies?.movie_features)
                     ? movies.movie_features[0]
                     : movies?.movie_features;
+
+                const emotions = emotionData[item.tmdb_id.toString()];
+                const dominant = emotions ? getDominantEmotion(emotions.e) : null;
 
                 return {
                     ...item,
@@ -287,7 +300,9 @@ export async function getMovieService() {
                     release_year: movies?.release_year || item.release_year,
                     genres: features?.genres?.map((g: any) => g.name) || [],
                     overview: features?.overview || item.overview,
-                    taste_score_formatted: formatTasteScore(item.taste_score)
+                    taste_score_formatted: formatTasteScore(item.taste_score),
+                    dominant_emotion: dominant?.emotion,
+                    dominant_emotion_score: dominant?.score,
                 };
             });
 
